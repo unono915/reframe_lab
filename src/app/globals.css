@@ -1,1 +1,22 @@
 @import "tailwindcss";
+@import "../styles/tokens.css";
+
+@layer base {
+  html {
+    background-color: var(--color-canvas);
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
+  }
+
+  /* DESIGN.md §14.2: outline: none으로 Focus를 제거하지 않는다 */
+  :focus-visible {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+}

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   checkStageRequirement,
   EXCEPTION_PROMPT_KEYS,
+  SELF_CHECK_ITEMS,
 } from "@/domain/training/requirements";
 import {
   makeAIFeedback,
@@ -323,5 +324,13 @@ describe("checkStageRequirement — feedback", () => {
       met: true,
       viaException: true,
     });
+  });
+});
+
+describe("SELF_CHECK_ITEMS", () => {
+  it("covers PRD §7.8's 6 quality dimensions with unique keys", () => {
+    expect(SELF_CHECK_ITEMS).toHaveLength(6);
+    const keys = new Set(SELF_CHECK_ITEMS.map((item) => item.key));
+    expect(keys.size).toBe(6);
   });
 });

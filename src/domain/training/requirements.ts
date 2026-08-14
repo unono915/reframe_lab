@@ -23,6 +23,23 @@ export const EXPLORATION_REQUIRED_PROMPT_KEYS = [
 /** feedback 단계에서 AI 장애 시 대체 경로 (PRD §7.12, §12.2 표 feedback 행). */
 export const FEEDBACK_SELF_CHECK_PROMPT_KEY = "self_checklist_completed";
 
+/**
+ * 위 경로에서 사용자가 직접 확인하는 체크리스트 문항 (PRD §7.8 6개 평가 차원).
+ * UI 문구지만 `lib/ai/`가 아니라 여기 둔다 — AI 판단이 아니라 이 요건 자체가 요구하는
+ * 자기 점검 항목이고, `features/`가 `lib/ai/`를 직접 import하지 못하게 막은 레이어
+ * 규칙(§4.1)을 우회하지 않기 위함이다. `STAGE_LABELS`(stages.ts)와 같은 이유의 선례다.
+ */
+export const SELF_CHECK_ITEMS = [
+  { key: "observation_evidence", label: "실제 장면이나 확인된 사실에서 출발했나요?" },
+  { key: "user_context", label: "누가 어떤 상황에서 겪는 문제인지 드러나나요?" },
+  { key: "goal_barrier_impact", label: "원하는 것과 방해 요소, 결과가 구분되나요?" },
+  { key: "fact_vs_hypothesis", label: "확인되지 않은 원인을 단정하지 않았나요?" },
+  { key: "scope", label: "지나치게 넓거나 특정 해결책으로 고정되지 않았나요?" },
+  { key: "next_exploration", label: "무엇을 더 확인해야 하는지 알 수 있나요?" },
+] as const;
+
+export type SelfCheckKey = (typeof SELF_CHECK_ITEMS)[number]["key"];
+
 export interface RequirementCheck {
   met: boolean;
   /** 최소 기준이 아니라 예외 경로로 통과했는지. UI가 "예외로 진행했음"을 표시하는 데 쓴다. */

@@ -83,6 +83,19 @@ const layerBoundaries = [
       ],
     },
   },
+  {
+    /**
+     * Phase 2 한정 예외. TrainingSessionProvider는 아직 `app/api/**`가 없는 상태에서
+     * 인메모리 Repository와 Mock Coach를 직접 오케스트레이션하는 것이 Phase 2의 실제
+     * 목표다(DEVELOPMENT_PLAN.md §10 Phase 2 구현 대상). Phase 3에서 Route Handler가
+     * 생기면 이 Provider는 fetch('/api/sessions/...')로 바꾸고 이 override를 지운다 —
+     * 그 전까지 다른 features/ 코드가 같은 지름길을 쓰지 못하게 이 파일 하나로 좁혀둔다.
+     */
+    files: ["src/features/training/TrainingSessionProvider.tsx"],
+    rules: {
+      "no-restricted-imports": "off",
+    },
+  },
 ];
 
 const eslintConfig = [

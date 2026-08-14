@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { mockCoachProvider } from "@/lib/ai/providers/mock";
 import { coachOutputSchema } from "@/lib/schemas/coach-output";
-import { getFallbackQuestion, SELF_CHECK_ITEMS } from "@/lib/ai/fallback";
+import { getFallbackQuestion } from "@/lib/ai/fallback";
 import { STAGE_ORDER } from "@/domain/training/stages";
 
 describe("mockCoachProvider — always returns exactly one valid question", () => {
@@ -67,13 +67,5 @@ describe("getFallbackQuestion", () => {
     for (const stage of STAGE_ORDER) {
       expect(getFallbackQuestion(stage, 0)).toBeTruthy();
     }
-  });
-});
-
-describe("SELF_CHECK_ITEMS", () => {
-  it("covers PRD §7.8's 6 quality dimensions with unique keys", () => {
-    expect(SELF_CHECK_ITEMS).toHaveLength(6);
-    const keys = new Set(SELF_CHECK_ITEMS.map((item) => item.key));
-    expect(keys.size).toBe(6);
   });
 });

@@ -56,15 +56,3 @@ export function getFallbackQuestion(stage: Stage, hintLevel: HintLevel): string 
       : STAGE_QUESTION_BANK[stage];
   return bank[hintLevel];
 }
-
-/** feedback 단계에서 AI 없이 완료하는 자기 점검 체크리스트 (PRD §7.8 6개 차원). */
-export const SELF_CHECK_ITEMS = [
-  { key: "observation_evidence", label: "실제 장면이나 확인된 사실에서 출발했나요?" },
-  { key: "user_context", label: "누가 어떤 상황에서 겪는 문제인지 드러나나요?" },
-  { key: "goal_barrier_impact", label: "원하는 것과 방해 요소, 결과가 구분되나요?" },
-  { key: "fact_vs_hypothesis", label: "확인되지 않은 원인을 단정하지 않았나요?" },
-  { key: "scope", label: "지나치게 넓거나 특정 해결책으로 고정되지 않았나요?" },
-  { key: "next_exploration", label: "무엇을 더 확인해야 하는지 알 수 있나요?" },
-] as const;
-
-export type SelfCheckKey = (typeof SELF_CHECK_ITEMS)[number]["key"];

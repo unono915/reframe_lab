@@ -23,7 +23,10 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
-export type ObservationDraft = Pick<Observation, "rawText" | "contextWhen" | "contextWhere">;
+export type ObservationDraft = Pick<
+  Observation,
+  "rawText" | "contextWhen" | "contextWhere"
+>;
 
 export function buildObservation(
   sessionId: string,
@@ -121,7 +124,10 @@ export function buildReframe(
   };
 }
 
-export type ProblemDefinitionDraft = Pick<ProblemDefinitionVersion, "text" | "changeReason">;
+export type ProblemDefinitionDraft = Pick<
+  ProblemDefinitionVersion,
+  "text" | "changeReason"
+>;
 
 export function buildProblemDefinitionVersion(
   sessionId: string,

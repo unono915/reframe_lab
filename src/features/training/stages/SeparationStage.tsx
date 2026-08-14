@@ -33,8 +33,12 @@ export function SeparationStage() {
 
   async function handleAdd() {
     if (!text.trim()) return;
-    await addObservationItem({ text, type });
+    // 먼저 지우고 나서 제출한다 — 반대로 하면 addObservationItem이 끝나길 기다리는
+    // 동안 사용자가 다음 항목을 입력했을 때, 뒤늦게 실행되는 setText("")가 방금 입력한
+    // 값을 지워버린다(연속 추가 시 실제로 재현됨).
+    const submitted = text;
     setText("");
+    await addObservationItem({ text: submitted, type });
   }
 
   async function handlePrimaryAction() {

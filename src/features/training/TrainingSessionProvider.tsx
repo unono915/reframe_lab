@@ -167,6 +167,24 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "snapshotUpdated", snapshot });
   }, []);
 
+  /**
+   * 모든 스냅샷 변형(mutate/advance/pause)은 이 큐를 통해서만 실행한다. IndexedDB
+   * 저장은 진짜 비동기라, 두 mutate가 겹쳐 호출되면(예: "추가하기"를 연속 클릭) 뒤의
+   * 호출이 앞의 저장이 끝나기 전의 snapshotRef를 읽어 방금 추가한 항목을 덮어써
+   * 잃어버릴 수 있다 — 실제 Playwright E2E로 재현했다(질문/재정의 연속 추가 시 첫
+   * 항목 유실). 큐로 직렬화하면 호출 속도와 무관하게 항상 최신 상태 위에서 계산한다.
+   */
+  const mutationQueueRef = useRef<Promise<unknown>>(Promise.resolve());
+
+  const enqueue = useCallback(<T,>(task: () => Promise<T>): Promise<T> => {
+    const run = mutationQueueRef.current.then(task, task);
+    mutationQueueRef.current = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -235,17 +253,18 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
 
   /** 스냅샷을 순수 함수로 변형하고, 저장소에 반영한 뒤 상태를 갱신하는 공용 헬퍼. */
   const mutate = useCallback(
-    async (
+    (
       fn: (current: TrainingSessionSnapshot) => TrainingSessionSnapshot,
-    ): Promise<TrainingSessionSnapshot | null> => {
-      const current = snapshotRef.current;
-      if (!current) return null;
-      const next = fn(current);
-      const saved = await sessionRepository.saveSnapshot(next);
-      commit(saved);
-      return saved;
-    },
-    [commit],
+    ): Promise<TrainingSessionSnapshot | null> =>
+      enqueue(async () => {
+        const current = snapshotRef.current;
+        if (!current) return null;
+        const next = fn(current);
+        const saved = await sessionRepository.saveSnapshot(next);
+        commit(saved);
+        return saved;
+      }),
+    [enqueue, commit],
   );
 
   const canAdvance = useMemo(
@@ -253,35 +272,44 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
     [state.snapshot],
   );
 
-  const advance = useCallback(async (): Promise<
-    { ok: true } | { ok: false; message: string }
-  > => {
-    const current = snapshotRef.current;
-    if (!current) return { ok: false, message: "세션이 아직 준비되지 않았습니다." };
-    const result = advanceStage(current, current.session.stateVersion);
-    if (!result.ok) return { ok: false, message: result.message };
+  const advance = useCallback(
+    (): Promise<{ ok: true } | { ok: false; message: string }> =>
+      enqueue(async () => {
+        const current = snapshotRef.current;
+        if (!current) return { ok: false, message: "세션이 아직 준비되지 않았습니다." };
+        const result = advanceStage(current, current.session.stateVersion);
+        if (!result.ok) return { ok: false, message: result.message };
 
-    // 다음 단계로 넘어가기 전 확정된 초안은 더 이상 필요 없다 — 이 stage의 draft를 지운다.
-    await clearSessionDrafts(current.session.id);
-    const saved = await sessionRepository.saveSnapshot({
-      ...current,
-      session: result.session,
-    });
-    commit(saved);
-    return { ok: true };
-  }, [commit]);
+        // 다음 단계로 넘어가기 전 확정된 초안은 더 이상 필요 없다 — 이 stage의 draft를 지운다.
+        await clearSessionDrafts(current.session.id);
+        const saved = await sessionRepository.saveSnapshot({
+          ...current,
+          session: result.session,
+        });
+        commit(saved);
+        return { ok: true };
+      }),
+    [enqueue, commit],
+  );
 
-  const pause = useCallback(async () => {
-    const current = snapshotRef.current;
-    if (!current) return;
-    const result = pauseSessionTransition(current.session, current.session.stateVersion);
-    if (!result.ok) return;
-    const saved = await sessionRepository.saveSnapshot({
-      ...current,
-      session: result.session,
-    });
-    commit(saved);
-  }, [commit]);
+  const pause = useCallback(
+    () =>
+      enqueue(async () => {
+        const current = snapshotRef.current;
+        if (!current) return;
+        const result = pauseSessionTransition(
+          current.session,
+          current.session.stateVersion,
+        );
+        if (!result.ok) return;
+        const saved = await sessionRepository.saveSnapshot({
+          ...current,
+          session: result.session,
+        });
+        commit(saved);
+      }),
+    [enqueue, commit],
+  );
 
   const saveDraft = useCallback((promptKey: string, content: string) => {
     const current = snapshotRef.current;

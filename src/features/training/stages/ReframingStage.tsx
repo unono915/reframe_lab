@@ -28,16 +28,20 @@ export function ReframingStage() {
   if (!snapshot) return null;
   const reframes = snapshot.reframes.filter((r) => r.authorType === "user");
 
+  // 두 함수 모두 제출 전에 먼저 입력창을 비운다 — await 이후에 비우면, 저장이 끝나길
+  // 기다리는 동안 사용자가 다음 값을 입력했을 때 뒤늦은 초기화가 그 값을 지워버린다.
   async function handleAddPerspective() {
     if (!perspectiveText.trim()) return;
-    await addPerspective({ lensType: perspectiveLens, content: perspectiveText });
+    const submitted = perspectiveText;
     setPerspectiveText("");
+    await addPerspective({ lensType: perspectiveLens, content: submitted });
   }
 
   async function handleAddReframe() {
     if (!reframeText.trim()) return;
-    await addReframe({ text: reframeText }, 0);
+    const submitted = reframeText;
     setReframeText("");
+    await addReframe({ text: submitted }, 0);
   }
 
   async function handlePrimaryAction() {

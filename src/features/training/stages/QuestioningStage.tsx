@@ -29,9 +29,14 @@ export function QuestioningStage() {
 
   async function handleAdd() {
     if (!text.trim()) return;
-    await addQuestion({ text }, hintLevel);
+    // 먼저 지우고 제출한다 — await 이후에 지우면 저장을 기다리는 동안 사용자가 다음
+    // 질문을 입력했을 때 뒤늦은 초기화가 그 입력을 지워버린다(실제로 재현됨: 연속으로
+    // 질문 3개를 빠르게 추가하면 그중 하나가 조용히 사라졌다).
+    const submitted = text;
+    const submittedHintLevel = hintLevel;
     setText("");
     setHintText(null);
+    await addQuestion({ text: submitted }, submittedHintLevel);
   }
 
   async function handleHint() {
@@ -42,9 +47,10 @@ export function QuestioningStage() {
 
   async function handleConfirmPriority(questionId: string) {
     if (!priorityReason.trim()) return;
-    await markPriorityQuestion(questionId, priorityReason);
+    const submitted = priorityReason;
     setPrioritySelectionId(null);
     setPriorityReason("");
+    await markPriorityQuestion(questionId, submitted);
   }
 
   async function handlePrimaryAction() {

@@ -25,9 +25,12 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `npx next dev --port ${PORT}`,
+    // 프로덕션 빌드로 띄운다 — dev 모드는 라우트별 온디맨드 컴파일과 Fast Refresh
+    // 때문에 자동화 클릭 타이밍이 흔들릴 수 있다(로컬에서 실제로 겪음: 여러 번의
+    // Fast Refresh 뒤 컴포넌트 클로저가 갱신되지 않는 것처럼 보이는 현상 재현).
+    command: `npx next build && npx next start --port ${PORT}`,
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
-    timeout: 60_000,
+    timeout: 180_000,
   },
 });

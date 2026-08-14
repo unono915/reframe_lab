@@ -1,17 +1,14 @@
 # ============================================================
-# reframe_lab
-# 스택 미정 상태 — 주요 언어/툴체인을 폭넓게 커버하는 기본 설정
-# 스택이 확정되면 해당 섹션만 남기고 정리하는 것을 권장
+# reframe_lab (다시봄) — Next.js + TypeScript
+# Phase 1에서 스택 확정 후 정리한 설정
 # ============================================================
 
 # ------------------------------------------------------------
 # 1. 보안 / 시크릿  ★ 절대 커밋 금지
 # ------------------------------------------------------------
 .env
-.env.*
+.env*.local
 !.env.example
-!.env.sample
-!.env.template
 
 *.pem
 *.key
@@ -23,7 +20,6 @@
 *.cer
 *.der
 
-# 인증 정보 / 토큰 / 서비스 계정
 secrets/
 .secrets/
 credentials.json
@@ -34,41 +30,17 @@ service-account*.json
 token.json
 *.token
 .npmrc
-.pypirc
 .netrc
 
-# 클라우드 / 인프라 인증
 .aws/
 .gcloud/
 .azure/
-*.tfvars
-*.tfstate
-*.tfstate.*
-.terraform/
-
-# 보안 점검 / 감사 결과 문서
-security/
-보안/
-*보안점검*
-*security-audit*
-*security-report*
-*pentest*
-*vulnerability-report*
 
 # ------------------------------------------------------------
-# 2. 개발용 문서 / 내부 메모 (프로그램 동작에 불필요)
+# 2. 기준 문서 (Source of Truth) — 로컬 전용, 백업은 사용자 책임
 # ------------------------------------------------------------
 CLAUDE.md
 CLAUDE.local.md
-.claude/
-AGENTS.md
-.cursor/
-.cursorrules
-.windsurfrules
-.aider*
-.github/copilot-instructions.md
-
-# 내부 기획 / 설계 / 작업 메모
 PRD.md
 DESIGN.md
 DEVELOPMENT_PLAN.md
@@ -83,100 +55,42 @@ NOTES.md
 MEMO.md
 *.draft.md
 *.private.md
+Claude Code*.md
 
 # ------------------------------------------------------------
 # 3. 의존성 / 빌드 산출물
 # ------------------------------------------------------------
-
-# Node / JavaScript / TypeScript
-node_modules/
-bower_components/
-.pnp
+/node_modules
+/.pnp
 .pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/releases
-!.yarn/plugins
-!.yarn/versions
-dist/
-build/
-out/
-.next/
-.nuxt/
-.svelte-kit/
-.astro/
-.vercel/
-.netlify/
-.turbo/
-.parcel-cache/
+/.next/
+/out/
+/build
+/dist
+.vercel
 *.tsbuildinfo
+next-env.d.ts
 .eslintcache
-.stylelintcache
-coverage/
-.nyc_output/
+/coverage
 
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-venv/
-.venv/
-env/
-ENV/
-pip-log.txt
-pip-delete-this-directory.txt
-.eggs/
-*.egg-info/
-*.egg
-.installed.cfg
-sdist/
-wheels/
-share/python-wheels/
-.pytest_cache/
-.mypy_cache/
-.dmypy.json
-.ruff_cache/
-.tox/
-.nox/
-htmlcov/
-.coverage
-.coverage.*
-*.cover
-.hypothesis/
-.ipynb_checkpoints/
-
-# Java / Kotlin / JVM
-target/
-*.class
-*.jar
-*.war
-*.ear
-.gradle/
-.mvn/wrapper/maven-wrapper.jar
-
-# Go
-*.exe
-*.exe~
-*.dll
-*.test
-vendor/
-
-# Rust
-Cargo.lock
-debug/
+# Serwist(@serwist/turbopack)는 SW를 public/이 아니라 src/app/serwist/[path]/route.ts가
+# 요청 시점에 esbuild로 번들링해 .next/ 산출물로 서빙한다. 별도 정적 파일이 생기지 않는다.
 
 # ------------------------------------------------------------
-# 4. 로그 / 캐시 / 임시 파일
+# 4. 테스트 산출물
+# ------------------------------------------------------------
+/playwright-report/
+/test-results/
+/blob-report/
+
+# ------------------------------------------------------------
+# 5. 로그 / 캐시 / 임시 파일
 # ------------------------------------------------------------
 *.log
 logs/
 npm-debug.log*
 yarn-debug.log*
-yarn-error.log*
 pnpm-debug.log*
-lerna-debug.log*
 
 *.tmp
 *.temp
@@ -189,16 +103,14 @@ tmp/
 temp/
 
 # ------------------------------------------------------------
-# 5. 로컬 데이터베이스 / 개인 데이터
+# 6. 로컬 데이터베이스 / 개인 데이터
 # ------------------------------------------------------------
 *.sqlite
 *.sqlite3
 *.db
 *.db-journal
 *.dump
-*.sql.gz
 
-# 개인정보 포함 가능성 있는 데이터 파일
 data/private/
 data/raw/
 uploads/
@@ -206,7 +118,7 @@ uploads/
 *.local.csv
 
 # ------------------------------------------------------------
-# 6. 에디터 / IDE
+# 7. 에디터 / IDE
 # ------------------------------------------------------------
 .vscode/*
 !.vscode/settings.json
@@ -214,16 +126,9 @@ uploads/
 !.vscode/launch.json
 .idea/
 *.iml
-*.iws
-*.ipr
-.project
-.classpath
-.settings/
-*.sublime-workspace
-*.sublime-project
 
 # ------------------------------------------------------------
-# 7. OS / OneDrive
+# 8. OS / OneDrive
 # ------------------------------------------------------------
 .DS_Store
 .DS_Store?
@@ -237,13 +142,11 @@ Desktop.ini
 desktop.ini
 $RECYCLE.BIN/
 *.lnk
-
-# MS Office 임시 잠금 파일 (OneDrive 동기화 폴더)
 ~$*
 *.laccdb
 
 # ------------------------------------------------------------
-# 8. 참고
+# 9. 참고
 # ------------------------------------------------------------
-# PRD.md / DESIGN.md / CLAUDE.md 는 위 2번 섹션에서 제외 처리했다.
+# PRD.md / DESIGN.md / DEVELOPMENT_PLAN.md / CLAUDE.md 는 2번 섹션에서 제외 처리했다.
 # 저장소에 공개할 필요가 생기면 해당 줄을 지우면 된다.

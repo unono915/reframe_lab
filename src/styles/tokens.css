@@ -1,0 +1,106 @@
+/**
+ * 디자인 토큰 단일 소스 (DESIGN.md §4.5 CSS Token Contract가 정본).
+ * 이 파일 밖에서 임의 Hex, Font Size, Radius, Shadow를 만들지 않는다 (DESIGN.md 문서 사용 원칙).
+ *
+ * 컬러·타이포·Radius는 Tailwind v4 `@theme`에 정의한다 — `@theme`는 CSS 변수 선언과
+ * 동시에 `bg-brand`, `text-display-lg`, `rounded-card` 같은 유틸리티를 생성한다.
+ * 간격(Spacing)은 별도 토큰을 만들지 않는다: DESIGN.md §6.1의 space-1..space-16 값은
+ * `space-N = N * 4px`로 Tailwind의 기본 spacing 스케일과 완전히 일치한다
+ * (예: DESIGN space-6=24px ↔ Tailwind 기본 `p-6`=24px). 항상 §6.1에 정의된 스텝 번호만 쓴다.
+ */
+@theme {
+  /* ---- Color: DESIGN.md §4.5 ---- */
+  --color-brand: #168c80;
+  --color-brand-strong: #0b6f66;
+  --color-brand-soft: #dff3ee;
+  --color-brand-quiet: #ecf7f4;
+  --color-brand-soft-hover: #d3eee7;
+  --color-brand-soft-pressed: #c4e7de;
+
+  --color-canvas: #fffcf7;
+  --color-paper: #fffefb;
+  --color-cream: #f7f2e9;
+  --color-warm-gray: #eee8de;
+
+  --color-ink: #252825;
+  --color-text-secondary: #5e655f;
+  --color-text-tertiary: #6f766f;
+  --color-border: #8b8378;
+  --color-border-strong: #82796e;
+  --color-divider: #dcd7cf;
+  --color-focus: #168c80;
+
+  --color-success: #2f7755;
+  --color-success-bg: #eaf6ee;
+  --color-warning: #8b641b;
+  --color-warning-bg: #fbf3df;
+  --color-danger: #a64040;
+  --color-danger-bg: #fceeee;
+
+  /* ---- Typography: DESIGN.md §5.1, §5.2 ----
+   * next/font/local이 --font-nanum-square-round 변수를 layout.tsx에서 주입한다 (§14-K).
+   * Weight는 이 스케일에 없다: 컴포넌트에서 font-normal/font-bold를 함께 지정한다. */
+  --font-sans:
+    var(--font-nanum-square-round), "Apple SD Gothic Neo", system-ui, sans-serif;
+
+  --text-display-lg: 2.25rem; /* 36px */
+  --text-display-lg--line-height: 3rem; /* 48px */
+  --text-display-md: 2rem; /* 32px */
+  --text-display-md--line-height: 2.6875rem; /* 43px */
+  --text-heading-1: 1.75rem; /* 28px */
+  --text-heading-1--line-height: 2.375rem; /* 38px */
+  --text-heading-2: 1.5rem; /* 24px */
+  --text-heading-2--line-height: 2.125rem; /* 34px */
+  --text-heading-3: 1.25rem; /* 20px */
+  --text-heading-3--line-height: 1.8125rem; /* 29px */
+  --text-body-lg: 1.125rem; /* 18px */
+  --text-body-lg--line-height: 1.875rem; /* 30px */
+  --text-body: 1rem; /* 16px */
+  --text-body--line-height: 1.625rem; /* 26px */
+  --text-label: 0.875rem; /* 14px */
+  --text-label--line-height: 1.3125rem; /* 21px */
+  --text-caption: 0.8125rem; /* 13px */
+  --text-caption--line-height: 1.1875rem; /* 19px */
+
+  /* ---- Radius: DESIGN.md §7.1 (pill은 Tailwind 기본 rounded-full 사용) ---- */
+  --radius-sm: 0.625rem; /* 10px */
+  --radius-control: 1rem; /* 16px */
+  --radius-button: 1.125rem; /* 18px */
+  --radius-card: 1.25rem; /* 20px */
+  --radius-sheet: 1.75rem; /* 28px */
+}
+
+/**
+ * Tailwind 유틸리티로 표현하기 애매한 토큰(모션, App Shell 크기, Scrim)은
+ * 일반 CSS 변수로 둔다. 컴포넌트에서 style={{ transitionDuration: 'var(--motion-fast)' }}
+ * 또는 Tailwind arbitrary value(`duration-[var(--motion-fast)]`)로 참조한다.
+ */
+:root {
+  /* ---- Motion: DESIGN.md §12.1 ---- */
+  --motion-instant: 0ms;
+  --motion-fast: 120ms;
+  --motion-standard: 200ms;
+  --motion-slow: 320ms;
+  --ease-enter: cubic-bezier(0.2, 0.6, 0.25, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --ease-standard: cubic-bezier(0.25, 0.1, 0.25, 1);
+
+  /* ---- App Shell: DESIGN.md §6.4, §19 ---- */
+  --size-app-bar: 3.5rem; /* 56px, safe-area-inset-top 별도 가산 */
+  --size-bottom-nav: 4rem; /* 64px, safe-area-inset-bottom 별도 가산 */
+  --size-sticky-action: 4.5rem; /* 72px, safe-area-inset-bottom 별도 가산 */
+  --size-button-height: 3.25rem; /* 52px, DESIGN.md §9.1 */
+  --size-touch-min: 2.75rem; /* 44px, DESIGN.md §14.2 */
+
+  /* ---- Scrim: DESIGN.md §7.4 ---- */
+  --color-scrim: rgb(37 40 37 / 32%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-instant: 0ms;
+    --motion-fast: 0ms;
+    --motion-standard: 0ms;
+    --motion-slow: 0ms;
+  }
+}

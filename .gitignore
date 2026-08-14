@@ -73,10 +73,8 @@ next-env.d.ts
 .eslintcache
 /coverage
 
-# Serwist가 빌드 시 생성하는 Service Worker 산출물 (소스는 src/에 있음)
-/public/sw.js
-/public/sw.js.map
-/public/swe-worker*.js
+# Serwist(@serwist/turbopack)는 SW를 public/이 아니라 src/app/serwist/[path]/route.ts가
+# 요청 시점에 esbuild로 번들링해 .next/ 산출물로 서빙한다. 별도 정적 파일이 생기지 않는다.
 
 # ------------------------------------------------------------
 # 4. 테스트 산출물

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { SerwistProvider } from "@serwist/turbopack/react";
 import { nanumSquareRound } from "@/styles/fonts";
 import "./globals.css";
 
@@ -10,6 +11,15 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: "default",
     title: "다시봄",
+  },
+  icons: {
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [
+      { url: "/icons/apple-touch-icon-180.png", sizes: "180x180", type: "image/png" },
+    ],
   },
 };
 
@@ -29,7 +39,20 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" className={nanumSquareRound.variable}>
-      <body className="min-h-dvh bg-canvas">{children}</body>
+      <body className="min-h-dvh bg-canvas">
+        {/*
+         * skipWaiting을 켜지 않았으므로(원칙 7·8) 새 SW는 자동으로 활성화되지 않는다.
+         * reloadOnOnline도 꺼서, 작성 중인 세션이 온라인 복귀만으로 강제 새로고침되지 않게 한다.
+         */}
+        <SerwistProvider
+          swUrl="/serwist/sw.js"
+          register
+          reloadOnOnline={false}
+          disable={process.env.NODE_ENV === "development"}
+        >
+          {children}
+        </SerwistProvider>
+      </body>
     </html>
   );
 }

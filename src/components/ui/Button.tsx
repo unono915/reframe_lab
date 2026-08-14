@@ -35,7 +35,9 @@ function buttonClasses(
     "text-body font-bold",
     "transition-[background-color,transform] duration-[var(--motion-fast)] ease-[var(--ease-standard)]",
     "disabled:cursor-not-allowed",
-    isTertiary ? "h-11 min-w-11 px-4" : "h-[var(--size-button-height)] px-6",
+    isTertiary
+      ? "h-[var(--size-touch-min)] min-w-[var(--size-touch-min)] px-4"
+      : "h-[var(--size-button-height)] px-6",
     !disabled && "active:scale-[0.985]",
     fullWidth && "w-full",
     variantClasses[variant],

@@ -8,7 +8,7 @@ import { Card, Stack } from "@/components/ui";
 export default function OfflinePage() {
   return (
     <main className="pt-safe pb-safe flex min-h-dvh items-center justify-center px-6">
-      <Card variant="neutral" className="w-full max-w-[420px] text-center">
+      <Card variant="neutral" className="w-full max-w-sm text-center">
         <Stack gap={3} align="center">
           <p className="text-heading-3 font-bold text-ink">오프라인이에요</p>
           <p className="text-body text-text-secondary">

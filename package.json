@@ -45,6 +45,7 @@
     "fake-indexeddb": "^6.2.5",
     "jsdom": "^27.4.0",
     "postcss": "^8.5.26",
+    "postgres": "^3.4.9",
     "prettier": "^3.9.6",
     "serwist": "^9.5.12",
     "tailwindcss": "^4.3.3",

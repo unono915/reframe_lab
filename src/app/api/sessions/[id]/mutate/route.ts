@@ -128,38 +128,6 @@ function applyMutation(
       });
       return { ...current, stageResponses: [...current.stageResponses, response] };
     }
-    case "recordCoachInteraction": {
-      const { output, ...meta } = mutation.args;
-      const interaction = {
-        id: crypto.randomUUID(),
-        sessionId: current.session.id,
-        stage: current.session.currentStage,
-        validatedOutput: output,
-        action: output.action,
-        ...meta,
-        isStale: false,
-        createdAt: new Date().toISOString(),
-      };
-      return {
-        ...current,
-        coachInteractions: [...current.coachInteractions, interaction],
-        session: { ...current.session, aiCallCount: current.session.aiCallCount + 1 },
-      };
-    }
-    case "recordAiFeedback": {
-      const feedback = {
-        id: crypto.randomUUID(),
-        sessionId: current.session.id,
-        ...mutation.args,
-        isStale: false,
-        createdAt: new Date().toISOString(),
-      };
-      return {
-        ...current,
-        aiFeedbacks: [...current.aiFeedbacks, feedback],
-        session: { ...current.session, aiCallCount: current.session.aiCallCount + 1 },
-      };
-    }
   }
 }
 

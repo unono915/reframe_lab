@@ -189,3 +189,35 @@ export function checkStageRequirement(
   if (stage === "not_started") return metNormally();
   return CHECKERS[stage](snapshot);
 }
+
+/**
+ * User-first gate(CLAUDE.md §3 원칙 1)의 실제 판정. `checkStageRequirement`보다
+ * 약한 기준이다 — "다음 단계로 넘어갈 만큼 충분한가"가 아니라 "이 단계에 사용자가
+ * 뭐라도 썼는가"만 본다. AI 코칭(힌트·피드백) 호출 직전 서버가 이 함수로 403을
+ * 판정한다(`app/api/sessions/[id]/coach`, `.../feedback`) — 빈 화면에 대고 AI를
+ * 부르지 못하게 막는다.
+ */
+export function hasMinimalUserInput(stage: Stage, snapshot: TrainingSessionSnapshot): boolean {
+  switch (stage) {
+    case "not_started":
+      return false;
+    case "observation":
+      return Boolean(snapshot.observation?.rawText.trim());
+    case "separation":
+      return snapshot.observationItems.length > 0;
+    case "questioning":
+      return snapshot.questions.some((q) => q.authorType === "user");
+    case "exploration":
+      return snapshot.stageResponses.some((r) => r.stage === "exploration" && !r.isDraft);
+    case "reframing":
+      return (
+        snapshot.perspectives.some((p) => p.authorType === "user") ||
+        snapshot.reframes.some((r) => r.authorType === "user")
+      );
+    case "definition":
+    case "feedback":
+      return snapshot.problemDefinitionVersions.some(
+        (v) => v.versionNumber === 1 && v.authorType === "user",
+      );
+  }
+}

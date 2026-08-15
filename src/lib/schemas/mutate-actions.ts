@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { coachOutputSchema } from "./coach-output";
 import {
   explorationResponseInputSchema,
   observationInputSchema,
@@ -45,41 +44,6 @@ export const mutateActionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("submitDefinition"), args: problemDefinitionInputSchema }),
   z.object({ action: z.literal("submitExceptionReason"), args: stageResponseInputSchema }),
   z.object({ action: z.literal("completeSelfCheck"), args: z.object({}) }),
-  z.object({
-    action: z.literal("recordCoachInteraction"),
-    args: z.object({
-      hintLevel: hintLevelSchema,
-      output: coachOutputSchema,
-      provider: z.string().min(1),
-      model: z.string().min(1),
-      promptVersion: z.string().min(1),
-      schemaVersion: z.string().min(1),
-      latencyMs: z.number().int().min(0),
-      status: z.enum(["ok", "error", "fallback"]),
-      errorCode: z.string().optional(),
-    }),
-  }),
-  z.object({
-    action: z.literal("recordAiFeedback"),
-    args: z.object({
-      problemDefinitionVersionId: z.string().min(1),
-      dimensions: z.record(
-        z.string(),
-        z.object({
-          status: z.enum(["shown", "explore_further", "unverified"]),
-          evidence: z.string(),
-        }),
-      ),
-      strength: z.string(),
-      improvementFocus: z.string(),
-      unverifiedAssumption: z.string(),
-      nextQuestion: z.string(),
-      provider: z.string().min(1),
-      model: z.string().min(1),
-      promptVersion: z.string().min(1),
-      schemaVersion: z.string().min(1),
-    }),
-  }),
 ]);
 
 /**

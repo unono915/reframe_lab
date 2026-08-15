@@ -91,23 +91,6 @@ const layerBoundaries = [
       ],
     },
   },
-  {
-    /**
-     * Phase 3에서 좁아진 예외. Repository 직접 호출은 사라지고 fetch('/api/sessions/...')로
-     * 바뀌었다(더 이상 `@/lib/repositories/*` 접근 불필요 — 이 override에서 뺐다). 남은
-     * `@/lib/ai/*`(Mock Coach) 허용은 Phase 4에서 `app/api/sessions/[id]/coach` Route
-     * Handler가 생기면 requestHint/requestFeedback을 fetch로 바꾸고 완전히 지운다.
-     */
-    files: ["src/features/training/TrainingSessionProvider.tsx"],
-    rules: {
-      "no-restricted-imports": [
-        "error",
-        {
-          patterns: ["@/lib/repositories/*", "@/lib/supabase/*", "@supabase/*"],
-        },
-      ],
-    },
-  },
 ];
 
 const eslintConfig = [

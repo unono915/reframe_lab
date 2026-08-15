@@ -36,9 +36,7 @@ import {
   type DraftRecord,
 } from "@/lib/persistence/drafts";
 import { findConflictingDrafts } from "@/lib/persistence/reconciliation";
-import { mockCoachProvider } from "@/lib/ai/providers/mock";
 import type { MutateAction } from "@/lib/schemas/mutate-actions";
-import type { CoachOutputSchema } from "@/lib/schemas/coach-output";
 import type { explorationPromptKeySchema } from "@/lib/schemas/stage-input";
 import type { z } from "zod";
 
@@ -140,8 +138,12 @@ export interface TrainingSessionContextValue {
     content: string,
   ) => Promise<void>;
   completeSelfCheck: () => Promise<void>;
-  requestHint: (hintLevel: HintLevel) => Promise<string>;
-  requestFeedback: () => Promise<AIFeedback | null>;
+  requestHint: (
+    hintLevel: HintLevel,
+  ) => Promise<{ ok: true; question: string } | { ok: false; message: string }>;
+  requestFeedback: () => Promise<
+    { ok: true; feedback: AIFeedback } | { ok: false; message: string }
+  >;
 }
 
 const TrainingSessionContext = createContext<TrainingSessionContextValue | null>(null);
@@ -448,60 +450,54 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
   }, [callMutate]);
 
   const requestHint = useCallback(
-    async (hintLevel: HintLevel): Promise<string> => {
-      const current = snapshotRef.current;
-      if (!current) return "";
-      const output = await mockCoachProvider.getCoachResponse({
-        stage: current.session.currentStage,
-        hintLevel,
-        userText: current.observation?.rawText ?? "",
-      });
-      await callMutate({
-        action: "recordCoachInteraction",
-        args: {
-          hintLevel,
-          // Training 중에는 currentStage가 "not_started"일 수 없다 — CoachOutput의
-          // Stage 타입은 domain/types.ts 전체를 쓰지만, coachOutputSchema는 활성
-          // 7단계만 받는다. 이 호출 지점에서는 항상 활성 세션 중이므로 안전하다.
-          output: output as CoachOutputSchema,
-          provider: mockCoachProvider.provider,
-          model: mockCoachProvider.model,
-          promptVersion: mockCoachProvider.promptVersion,
-          schemaVersion: mockCoachProvider.schemaVersion,
-          latencyMs: 0,
-          status: "ok",
-        },
-      });
-      return output.question ?? "";
-    },
-    [callMutate],
+    (
+      hintLevel: HintLevel,
+    ): Promise<{ ok: true; question: string } | { ok: false; message: string }> =>
+      enqueue(async () => {
+        const current = snapshotRef.current;
+        if (!current) return { ok: false, message: "세션이 아직 준비되지 않았습니다." };
+        const response = await fetch(`/api/sessions/${current.session.id}/coach`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ hintLevel, clientRequestId: crypto.randomUUID() }),
+        });
+        const body = await parseJsonSafe<
+          { question: string | null; snapshot: TrainingSessionSnapshot } & Partial<ApiErrorBody>
+        >(response);
+        if (!response.ok || !body) {
+          return { ok: false, message: body?.message ?? "힌트를 가져오지 못했어요." };
+        }
+        commit(body.snapshot);
+        return { ok: true, question: body.question ?? "" };
+      }),
+    [enqueue, commit],
   );
 
-  const requestFeedback = useCallback(async (): Promise<AIFeedback | null> => {
-    const current = snapshotRef.current;
-    if (!current) return null;
-    const latest = current.problemDefinitionVersions.reduce<
-      TrainingSessionSnapshot["problemDefinitionVersions"][number] | null
-    >((max, v) => (!max || v.versionNumber > max.versionNumber ? v : max), null);
-    if (!latest) return null;
-
-    const quote = latest.text.length > 60 ? `${latest.text.slice(0, 60)}…` : latest.text;
-    const feedbackArgs = {
-      problemDefinitionVersionId: latest.id,
-      dimensions: {},
-      strength: `"${quote}"처럼 실제 문장에서 출발한 점이 좋아요.`,
-      improvementFocus: "아직 확인하지 못한 사람들의 입장도 있는지 살펴보면 더 좋아요.",
-      unverifiedAssumption: "지금 든 원인이 유일한 원인이라고 단정하지 않았는지 확인해보세요.",
-      nextQuestion: "이 정의만 보고 다른 사람도 상황을 이해할 수 있을까요?",
-      provider: mockCoachProvider.provider,
-      model: mockCoachProvider.model,
-      promptVersion: mockCoachProvider.promptVersion,
-      schemaVersion: mockCoachProvider.schemaVersion,
-    };
-    const saved = await callMutate({ action: "recordAiFeedback", args: feedbackArgs });
-    const feedback = saved?.aiFeedbacks.at(-1);
-    return feedback ?? null;
-  }, [callMutate]);
+  const requestFeedback = useCallback(
+    (): Promise<{ ok: true; feedback: AIFeedback } | { ok: false; message: string }> =>
+      enqueue(async () => {
+        const current = snapshotRef.current;
+        if (!current) return { ok: false, message: "세션이 아직 준비되지 않았습니다." };
+        const response = await fetch(`/api/sessions/${current.session.id}/feedback`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clientRequestId: crypto.randomUUID() }),
+        });
+        const body = await parseJsonSafe<
+          | { feedback: AIFeedback; snapshot: TrainingSessionSnapshot }
+          | { errorCode: string; message: string }
+        >(response);
+        if (!response.ok || !body || !("feedback" in body)) {
+          return {
+            ok: false,
+            message: body && "message" in body ? body.message : "AI 피드백을 지금은 만들 수 없어요.",
+          };
+        }
+        commit(body.snapshot);
+        return { ok: true, feedback: body.feedback };
+      }),
+    [enqueue, commit],
+  );
 
   const value: TrainingSessionContextValue = {
     status: state.status,

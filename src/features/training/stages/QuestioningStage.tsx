@@ -20,6 +20,8 @@ export function QuestioningStage() {
   const [text, setText] = useState("");
   const [hintLevel, setHintLevel] = useState<HintLevel>(0);
   const [hintText, setHintText] = useState<string | null>(null);
+  const [hintPending, setHintPending] = useState(false);
+  const [hintError, setHintError] = useState<string | null>(null);
   const [prioritySelectionId, setPrioritySelectionId] = useState<string | null>(null);
   const [priorityReason, setPriorityReason] = useState("");
   const [exceptionReason, setExceptionReason] = useState("");
@@ -40,8 +42,15 @@ export function QuestioningStage() {
   }
 
   async function handleHint() {
-    const question = await requestHint(hintLevel);
-    setHintText(question);
+    setHintPending(true);
+    setHintError(null);
+    const result = await requestHint(hintLevel);
+    setHintPending(false);
+    if (!result.ok) {
+      setHintError(result.message);
+      return;
+    }
+    setHintText(result.question);
     setHintLevel((level) => (level < 2 ? ((level + 1) as HintLevel) : level));
   }
 
@@ -132,13 +141,18 @@ export function QuestioningStage() {
           />
         </Field>
         <Stack direction="row" gap={2}>
-          <Button type="button" variant="tertiary" onClick={handleHint}>
-            힌트 보기
+          <Button type="button" variant="tertiary" onClick={handleHint} disabled={hintPending}>
+            {hintPending ? "힌트 요청 중" : hintError ? "다시 시도" : "힌트 보기"}
           </Button>
           <Button type="button" variant="primary" onClick={handleAdd}>
             질문 추가하기
           </Button>
         </Stack>
+        {hintError && (
+          <p role="alert" className="text-caption font-bold text-danger">
+            {hintError}
+          </p>
+        )}
         {hintText && (
           <Card variant="coach">
             <p className="text-body-lg text-ink">{hintText}</p>

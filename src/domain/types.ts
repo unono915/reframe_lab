@@ -240,6 +240,35 @@ export interface TrainingSession {
 }
 
 /**
+ * History·Growth·Home이 쓰는 조회 전용 요약. 전체 스냅샷(`TrainingSessionSnapshot`)이
+ * 아니라 이 축소 모델을 쓰는 이유는 두 가지다:
+ *
+ * 1. **쿼리 수** — 스냅샷 하나를 만들려면 자식 테이블까지 10개 쿼리가 필요하다.
+ *    목록 화면이 세션마다 그걸 하면 N+1이 된다(36개 기록에서 360쿼리·1~3초 실측).
+ * 2. **전송량** — 목록에 쓰지도 않는 coach_interactions·stage_responses까지 실어
+ *    보내면 36개 기록에 143KB였다. 매일 쌓이는 앱이라 선형으로 나빠진다.
+ *
+ * `TrainingHistory`/`GrowthMetric`을 별도 Entity로 만들지 않는다는 설계 결정
+ * (DEVELOPMENT_PLAN.md §6 "조회 모델·계산 함수")의 "조회 모델"이 바로 이것이다 —
+ * 저장되는 실체가 아니라 기존 테이블에서 매번 파생시키는 읽기 전용 뷰다.
+ */
+export interface SessionSummary {
+  id: string;
+  trainingDate: string;
+  status: SessionStatus;
+  templateId: string;
+  originSessionId?: string;
+  /** History Row에 보여줄 관찰 첫 문장. 관찰 작성 전이면 null. */
+  observationText: string | null;
+  /** 최신 버전의 문제 정의 문장. 아직 없으면 null. */
+  latestDefinitionText: string | null;
+  /** Growth "직접 작성한 재정의" 집계용 — 사용자가 쓴 reframe 개수. */
+  userReframeCount: number;
+  /** Growth "정의를 다시 써본 기록" 집계용 — 사용자가 쓴 v2 이상이 있는지. */
+  hasUserRevisedDefinition: boolean;
+}
+
+/**
  * 세션 하나의 전체 산출물 스냅샷. `domain/training/*`의 순수 함수는 전부 이 타입을
  * 입력받아 판정한다 — 서버 Route Handler와 클라이언트가 같은 함수에 같은 스냅샷을
  * 넘기는 것이 "상태 전환의 유일한 판정자"(DEVELOPMENT_PLAN.md §4.2) 원칙의 실제 구현이다.

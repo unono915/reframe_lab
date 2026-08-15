@@ -1,4 +1,4 @@
-import type { TrainingSessionSnapshot } from "@/domain/types";
+import type { SessionSummary } from "@/domain/types";
 
 /**
  * DESIGN.md §10.7 S-07 Growth — 점수화 대신 꾸준함·재정의·수정 행동을 보여준다.
@@ -42,37 +42,38 @@ function addDays(dateString: string, days: number): string {
 }
 
 /**
- * @param sessions 사용자의 세션 스냅샷 목록(상태 무관 — 이 함수가 completed만 걸러낸다).
+ * @param sessions 사용자의 세션 요약 목록(상태 무관 — 이 함수가 completed만 걸러낸다).
+ *   전체 스냅샷이 아니라 `SessionSummary`를 받는다(그 타입의 주석 참고 — 목록 화면이
+ *   스냅샷을 세션마다 만들면 N+1이 된다).
  * @param todayDateString 호출 시점의 사용자 로컬 날짜(YYYY-MM-DD). 서버는 요청의
  *   timezone으로, 클라이언트는 `Intl.DateTimeFormat`으로 구해 넘긴다.
  */
 export function computeGrowthMetrics(
-  sessions: TrainingSessionSnapshot[],
+  sessions: SessionSummary[],
   todayDateString: string,
 ): GrowthMetrics {
-  const completed = sessions.filter((s) => s.session.status === "completed");
+  const completed = sessions.filter((s) => s.status === "completed");
 
   const thisWeekStart = mondayOf(todayDateString);
   const completedThisWeek = completed.filter(
-    (s) => mondayOf(s.session.trainingDate) === thisWeekStart,
+    (s) => mondayOf(s.trainingDate) === thisWeekStart,
   ).length;
 
   const recentWeeks: WeeklyRhythmBucket[] = [3, 2, 1, 0].map((weeksAgo) => {
     const weekStart = addDays(thisWeekStart, -7 * weeksAgo);
     return {
       weekStart,
-      completedCount: completed.filter((s) => mondayOf(s.session.trainingDate) === weekStart)
-        .length,
+      completedCount: completed.filter((s) => mondayOf(s.trainingDate) === weekStart).length,
     };
   });
 
   const userAuthoredReframeCount = completed.reduce(
-    (sum, s) => sum + s.reframes.filter((r) => r.authorType === "user").length,
+    (sum, s) => sum + s.userReframeCount,
     0,
   );
 
-  const revisedDefinitionSessionCount = completed.filter((s) =>
-    s.problemDefinitionVersions.some((v) => v.versionNumber > 1 && v.authorType === "user"),
+  const revisedDefinitionSessionCount = completed.filter(
+    (s) => s.hasUserRevisedDefinition,
   ).length;
 
   return {

@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Card, LinkButton, Stack } from "@/components/ui";
-import type { TrainingSession, TrainingSessionSnapshot, TrainingTemplate } from "@/domain/types";
+import { Button, Card, LinkButton, PageState, Stack } from "@/components/ui";
+import type { SessionSummary, TrainingSession, TrainingTemplate } from "@/domain/types";
 import { signOut } from "@/lib/auth/client";
+import { fetchJson } from "@/lib/fetch-json";
 
 function detectTimezone(): string {
   try {
@@ -12,6 +13,39 @@ function detectTimezone(): string {
   } catch {
     return "UTC";
   }
+}
+
+type HomeData =
+  | { ok: true; activeSession: TrainingSession | null; template: TrainingTemplate | null }
+  | { ok: false; message: string };
+
+/**
+ * setState를 하지 않는 순수 로더 — 화면 상태 적용은 호출자가 한다.
+ *
+ * 오늘의 렌즈와 "이어서 하기" 여부는 Home이 존재하기 위한 필수 정보라 실패하면
+ * 오류를 돌려준다. 반면 템플릿 목록 조회는 진행 중 세션의 렌즈 이름을 붙이기 위한
+ * 보조 조회라, 실패해도 이름만 비우고 화면은 정상적으로 보여준다.
+ */
+async function fetchHome(): Promise<HomeData> {
+  const activeResult = await fetchJson<{ snapshot: { session: TrainingSession } | null }>(
+    "/api/sessions?status=active",
+  );
+  if (!activeResult.ok) return { ok: false, message: activeResult.message };
+
+  const active = activeResult.data.snapshot;
+  if (active) {
+    const templatesResult = await fetchJson<{ templates: TrainingTemplate[] }>("/api/templates");
+    const template = templatesResult.ok
+      ? (templatesResult.data.templates.find((t) => t.id === active.session.templateId) ?? null)
+      : null;
+    return { ok: true, activeSession: active.session, template };
+  }
+
+  const todayResult = await fetchJson<{ template: TrainingTemplate }>(
+    `/api/templates/today?timezone=${encodeURIComponent(detectTimezone())}`,
+  );
+  if (!todayResult.ok) return { ok: false, message: todayResult.message };
+  return { ok: true, activeSession: null, template: todayResult.data.template };
 }
 
 /**
@@ -23,7 +57,9 @@ export default function HomePage() {
   const router = useRouter();
   const [template, setTemplate] = useState<TrainingTemplate | null>(null);
   const [activeSession, setActiveSession] = useState<TrainingSession | null>(null);
-  const [recentRecord, setRecentRecord] = useState<TrainingSessionSnapshot | null>(null);
+  const [recentRecord, setRecentRecord] = useState<SessionSummary | null>(null);
+  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSignOut() {
     await signOut();
@@ -31,49 +67,47 @@ export default function HomePage() {
     router.refresh();
   }
 
+  const apply = useCallback((result: Awaited<ReturnType<typeof fetchHome>>) => {
+    if (!result.ok) {
+      setError(result.message);
+      setStatus("error");
+      return;
+    }
+    setActiveSession(result.activeSession);
+    setTemplate(result.template);
+    setStatus("ready");
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
+    void fetchHome().then((result) => {
+      if (!cancelled) apply(result);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [apply]);
 
-    async function load() {
-      const activeRes = await fetch("/api/sessions?status=active");
-      const activeBody = (await activeRes.json()) as {
-        snapshot: { session: TrainingSession } | null;
-      };
-
-      if (activeBody.snapshot) {
-        const templatesRes = await fetch("/api/templates");
-        const templatesBody = (await templatesRes.json()) as { templates: TrainingTemplate[] };
-        const t =
-          templatesBody.templates.find(
-            (item) => item.id === activeBody.snapshot?.session.templateId,
-          ) ?? null;
-        if (!cancelled) {
-          setActiveSession(activeBody.snapshot.session);
-          setTemplate(t);
-        }
-        return;
-      }
-
-      const todayRes = await fetch(
-        `/api/templates/today?timezone=${encodeURIComponent(detectTimezone())}`,
-      );
-      const todayBody = (await todayRes.json()) as { template: TrainingTemplate };
-      if (!cancelled) setTemplate(todayBody.template);
-    }
-
-    async function loadRecentRecord() {
-      const res = await fetch("/api/history");
-      const body = (await res.json()) as { sessions: TrainingSessionSnapshot[] };
-      const completed = body.sessions.find((s) => s.session.status === "completed");
-      if (!cancelled) setRecentRecord(completed ?? null);
-    }
-
-    void load();
-    void loadRecentRecord();
+  useEffect(() => {
+    let cancelled = false;
+    void fetchJson<{ sessions: SessionSummary[] }>("/api/history").then((result) => {
+      if (cancelled || !result.ok) return;
+      setRecentRecord(result.data.sessions.find((s) => s.status === "completed") ?? null);
+    });
     return () => {
       cancelled = true;
     };
   }, []);
+
+  function handleRetry() {
+    setStatus("loading");
+    setError(null);
+    void fetchHome().then(apply);
+  }
+
+  if (status === "error") {
+    return <PageState status="error" message={error ?? undefined} onRetry={handleRetry} />;
+  }
 
   const isResuming = activeSession && activeSession.status !== "completed";
   const trainingHref = activeSession ? `/training/${activeSession.id}` : "/training/new";
@@ -97,9 +131,13 @@ export default function HomePage() {
         <Card variant="daily">
           <Stack gap={3}>
             <p className="text-label font-bold text-brand-strong">오늘 다시 볼 장면</p>
-            <p className="text-display-md font-bold text-ink">
+            {/*
+              화면의 주제를 담은 유일한 문장이라 h1이다 — 시각적 크기는 이미
+              display-md라 바뀌지 않고, 스크린리더에만 문서 제목으로 전달된다.
+            */}
+            <h1 className="text-display-md font-bold text-ink">
               {template?.prompt ?? "오늘의 렌즈를 준비하고 있어요."}
-            </p>
+            </h1>
           </Stack>
         </Card>
         <LinkButton href={trainingHref} variant="primary" fullWidth>
@@ -107,16 +145,11 @@ export default function HomePage() {
         </LinkButton>
 
         {recentRecord && (
-          <Card
-            variant="interactive"
-            onClick={() => router.push(`/result/${recentRecord.session.id}`)}
-          >
+          <Card variant="interactive" onClick={() => router.push(`/result/${recentRecord.id}`)}>
             <Stack gap={2}>
               <p className="text-label font-bold text-text-secondary">최근 다시 본 기록</p>
               <p className="line-clamp-2 text-body text-ink">
-                {[...recentRecord.problemDefinitionVersions].sort(
-                  (a, b) => b.versionNumber - a.versionNumber,
-                )[0]?.text ?? recentRecord.observation?.rawText}
+                {recentRecord.latestDefinitionText ?? recentRecord.observationText}
               </p>
             </Stack>
           </Card>

@@ -1,37 +1,57 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Badge, Button, Card, LinkButton, Stack } from "@/components/ui";
-import type { TrainingSessionSnapshot, TrainingTemplate } from "@/domain/types";
+import { Badge, Card, LinkButton, PageState, Button, Stack } from "@/components/ui";
+import type { SessionSummary, TrainingTemplate } from "@/domain/types";
 import { sessionStatusLabel } from "@/domain/training/stages";
+import { formatMonthLabel, formatRecordDate } from "@/domain/format-date";
+import { fetchJson } from "@/lib/fetch-json";
 
 /**
  * S-05 History (DESIGN.md §10.5). 월 단위 느슨한 Grouping, 최근순, 날짜·Lens·
  * 관찰 첫 문장·상태를 한 Row에 보여준다. Empty State는 "기록이 없다"에서 끝내지
  * 않고 오늘의 훈련으로 연결한다.
  */
+/** setState를 하지 않는 순수 로더 — 화면 상태 적용은 호출자가 한다. */
+async function fetchHistory() {
+  const [history, templates] = await Promise.all([
+    fetchJson<{ sessions: SessionSummary[] }>("/api/history"),
+    fetchJson<{ templates: TrainingTemplate[] }>("/api/templates"),
+  ]);
+  return { history, templates };
+}
+
 export default function HistoryPage() {
   const router = useRouter();
-  const [sessions, setSessions] = useState<TrainingSessionSnapshot[] | null>(null);
+  const [sessions, setSessions] = useState<SessionSummary[] | null>(null);
   const [templates, setTemplates] = useState<TrainingTemplate[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  const apply = useCallback(({ history, templates }: Awaited<ReturnType<typeof fetchHistory>>) => {
+    if (!history.ok) {
+      setError(history.message);
+      return;
+    }
+    setSessions(history.data.sessions);
+    // 템플릿은 보조 정보(렌즈 이름)라 실패해도 목록 자체는 보여준다.
+    if (templates.ok) setTemplates(templates.data.templates);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
-    void Promise.all([
-      fetch("/api/history").then((r) => r.json()) as Promise<{
-        sessions: TrainingSessionSnapshot[];
-      }>,
-      fetch("/api/templates").then((r) => r.json()) as Promise<{ templates: TrainingTemplate[] }>,
-    ]).then(([historyBody, templatesBody]) => {
-      if (cancelled) return;
-      setSessions(historyBody.sessions);
-      setTemplates(templatesBody.templates);
+    void fetchHistory().then((result) => {
+      if (!cancelled) apply(result);
     });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [apply]);
+
+  function handleRetry() {
+    setError(null);
+    void fetchHistory().then(apply);
+  }
 
   const templateById = useMemo(
     () => new Map(templates.map((t) => [t.id, t])),
@@ -40,9 +60,9 @@ export default function HistoryPage() {
 
   const groups = useMemo(() => {
     if (!sessions) return [];
-    const byMonth = new Map<string, TrainingSessionSnapshot[]>();
+    const byMonth = new Map<string, SessionSummary[]>();
     for (const s of sessions) {
-      const month = s.session.trainingDate.slice(0, 7); // YYYY-MM
+      const month = s.trainingDate.slice(0, 7); // YYYY-MM
       const list = byMonth.get(month) ?? [];
       list.push(s);
       byMonth.set(month, list);
@@ -50,12 +70,11 @@ export default function HistoryPage() {
     return [...byMonth.entries()].sort((a, b) => b[0].localeCompare(a[0]));
   }, [sessions]);
 
+  if (error) {
+    return <PageState status="error" message={error} onRetry={handleRetry} />;
+  }
   if (sessions === null) {
-    return (
-      <main className="flex min-h-dvh items-center justify-center px-5">
-        <p className="text-body text-text-secondary">기록을 불러오고 있어요.</p>
-      </main>
-    );
+    return <PageState status="loading" loadingLabel="기록을 불러오고 있어요." />;
   }
 
   return (
@@ -80,33 +99,33 @@ export default function HistoryPage() {
         <Stack gap={6}>
           {groups.map(([month, monthSessions]) => (
             <Stack key={month} gap={3}>
-              <p className="text-label font-bold text-text-secondary">
-                {month.replace("-", "년 ")}월
-              </p>
+              <h2 className="text-label font-bold text-text-secondary">
+                {formatMonthLabel(month)}
+              </h2>
               <Stack gap={2}>
                 {monthSessions.map((s) => {
-                  const template = templateById.get(s.session.templateId);
+                  const template = templateById.get(s.templateId);
                   return (
                     <Card
-                      key={s.session.id}
+                      key={s.id}
                       variant="interactive"
                       className="min-h-[72px] w-full"
-                      onClick={() => router.push(`/result/${s.session.id}`)}
+                      onClick={() => router.push(`/result/${s.id}`)}
                     >
                       <Stack gap={1}>
                         <Stack direction="row" justify="between" align="center" gap={2}>
                           <p className="text-caption font-bold text-text-secondary">
-                            {s.session.trainingDate}
+                            {formatRecordDate(s.trainingDate)}
                           </p>
-                          <Badge variant={s.session.status === "completed" ? "brand" : "neutral"}>
-                            {sessionStatusLabel(s.session.status)}
+                          <Badge variant={s.status === "completed" ? "brand" : "neutral"}>
+                            {sessionStatusLabel(s.status)}
                           </Badge>
                         </Stack>
                         {template && (
                           <p className="text-caption text-text-tertiary">{template.title}</p>
                         )}
                         <p className="line-clamp-2 text-body text-ink">
-                          {s.observation?.rawText || "(관찰 작성 전)"}
+                          {s.observationText || "(관찰 작성 전)"}
                         </p>
                       </Stack>
                     </Card>

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { TrainingSessionSnapshot } from "@/domain/types";
+import type { SessionSummary, TrainingSessionSnapshot } from "@/domain/types";
 import type { Database } from "@/lib/supabase/database.types";
 import type { CreateSessionParams, SessionRepository } from "../types";
 import {
@@ -231,20 +231,74 @@ export function createSupabaseSessionRepository(
       if (error) throw error;
     },
 
-    async listSessionsForUser(
+    /**
+     * 세션 수와 무관하게 쿼리 4개만 쓴다(세션 목록 + 관찰 + 정의 + 재정의). 예전
+     * 구현은 세션마다 `getSnapshot`을 불러 N+1이었다 — 실측 36개 기록에서 360쿼리·
+     * 1~3초·143KB였고, 매일 쌓이는 앱이라 선형으로 나빠졌다.
+     */
+    async listSessionSummariesForUser(
       userId: string,
       limit = 100,
-    ): Promise<TrainingSessionSnapshot[]> {
-      const { data, error } = await client
+    ): Promise<SessionSummary[]> {
+      const { data: sessionRows, error } = await client
         .from("training_sessions")
-        .select("id")
+        .select("id, training_date, status, template_id, origin_session_id")
         .eq("user_id", userId)
         .order("started_at", { ascending: false })
         .limit(limit);
       if (error) throw error;
+      if (!sessionRows || sessionRows.length === 0) return [];
 
-      const snapshots = await Promise.all((data ?? []).map((row) => getSnapshot(row.id)));
-      return snapshots.filter((s): s is TrainingSessionSnapshot => s !== null);
+      const ids = sessionRows.map((row) => row.id);
+      const [observationsResult, definitionsResult, reframesResult] = await Promise.all([
+        client.from("observations").select("session_id, raw_text").in("session_id", ids),
+        client
+          .from("problem_definition_versions")
+          .select("session_id, version_number, text, author_type")
+          .in("session_id", ids),
+        // 개수만 필요하지만 PostgREST의 그룹 집계는 뷰가 필요하다 — id만 골라
+        // 받아서 애플리케이션에서 센다(행당 uuid 하나라 전송량이 작다).
+        client.from("reframes").select("session_id, author_type").in("session_id", ids),
+      ]);
+      for (const result of [observationsResult, definitionsResult, reframesResult]) {
+        if (result.error) throw result.error;
+      }
+
+      const observationBySession = new Map(
+        (observationsResult.data ?? []).map((row) => [row.session_id, row.raw_text]),
+      );
+
+      const latestDefinitionBySession = new Map<string, string>();
+      const revisedSessions = new Set<string>();
+      const latestVersionBySession = new Map<string, number>();
+      for (const row of definitionsResult.data ?? []) {
+        const seen = latestVersionBySession.get(row.session_id) ?? 0;
+        if (row.version_number > seen) {
+          latestVersionBySession.set(row.session_id, row.version_number);
+          latestDefinitionBySession.set(row.session_id, row.text);
+        }
+        if (row.version_number > 1 && row.author_type === "user") {
+          revisedSessions.add(row.session_id);
+        }
+      }
+
+      const userReframeCounts = new Map<string, number>();
+      for (const row of reframesResult.data ?? []) {
+        if (row.author_type !== "user") continue;
+        userReframeCounts.set(row.session_id, (userReframeCounts.get(row.session_id) ?? 0) + 1);
+      }
+
+      return sessionRows.map((row) => ({
+        id: row.id,
+        trainingDate: row.training_date,
+        status: row.status as SessionSummary["status"],
+        templateId: row.template_id,
+        originSessionId: row.origin_session_id ?? undefined,
+        observationText: observationBySession.get(row.id) ?? null,
+        latestDefinitionText: latestDefinitionBySession.get(row.id) ?? null,
+        userReframeCount: userReframeCounts.get(row.id) ?? 0,
+        hasUserRevisedDefinition: revisedSessions.has(row.id),
+      }));
     },
   };
 }

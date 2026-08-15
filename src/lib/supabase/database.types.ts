@@ -116,6 +116,30 @@ export type Database = {
         };
         Relationships: [];
       };
+      idempotency_keys: {
+        Row: {
+          client_request_id: string;
+          created_at: string;
+          response_body: Json;
+          response_status: number;
+          user_id: string;
+        };
+        Insert: {
+          client_request_id: string;
+          created_at?: string;
+          response_body: Json;
+          response_status: number;
+          user_id: string;
+        };
+        Update: {
+          client_request_id?: string;
+          created_at?: string;
+          response_body?: Json;
+          response_status?: number;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       observation_items: {
         Row: {
           author_type: string;

@@ -15,6 +15,8 @@ export interface CreateSessionParams {
   trainingDate: string;
   timezone: string;
   clientGeneratedId: string;
+  /** Revisit(다시 생각하기) 세션일 때만 채운다 — 원본은 절대 수정하지 않는다. */
+  originSessionId?: string;
 }
 
 export interface SessionRepository {
@@ -25,6 +27,8 @@ export interface SessionRepository {
   saveSnapshot(snapshot: TrainingSessionSnapshot): Promise<TrainingSessionSnapshot>;
   /** 오늘의 렌즈 선택 시 최근 노출 렌즈를 피하는 데 쓴다(domain/templates/selection.ts). */
   listRecentTemplateIds(userId: string, limit: number): Promise<string[]>;
+  /** 개별 기록 삭제(History). 자식 산출물은 DB의 ON DELETE CASCADE로 함께 지워진다. */
+  deleteSession(sessionId: string): Promise<void>;
 }
 
 export interface TemplateRepository {

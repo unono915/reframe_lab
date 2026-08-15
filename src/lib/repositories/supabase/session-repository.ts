@@ -170,6 +170,7 @@ export function createSupabaseSessionRepository(
         last_active_stage: null,
         state_version: 0,
         ai_call_count: 0,
+        origin_session_id: params.originSessionId ?? null,
         started_at: now,
         last_active_at: now,
         created_at: now,
@@ -223,6 +224,11 @@ export function createSupabaseSessionRepository(
         .limit(limit);
       if (error) throw error;
       return (data ?? []).map((row) => row.template_id);
+    },
+
+    async deleteSession(sessionId: string): Promise<void> {
+      const { error } = await client.from("training_sessions").delete().eq("id", sessionId);
+      if (error) throw error;
     },
   };
 }

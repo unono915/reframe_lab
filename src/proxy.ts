@@ -1,7 +1,12 @@
 import { type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 
-export async function middleware(request: NextRequest) {
+/**
+ * Next.js 16에서 `middleware.ts`는 폐기되고 `proxy.ts`로 이름이 바뀌었다
+ * (node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/proxy.md).
+ * 동작은 동일 — 세션 쿠키 갱신 + 인증 게이트(lib/supabase/middleware.ts).
+ */
+export async function proxy(request: NextRequest) {
   return updateSession(request);
 }
 

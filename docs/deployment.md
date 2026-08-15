@@ -69,6 +69,34 @@ Supabase 대시보드 → Authentication → URL Configuration:
   Preview 배포는 커밋마다 도메인이 바뀌므로, Preview에서도 회원가입을 테스트하려면
   `https://reframe-lab-*.vercel.app/**` 같은 와일드카드 항목이 추가로 필요하다.
 
+## 3-1. 증상별 진단
+
+### 사이트 전체가 `Internal Server Error` (스타일 없는 한 줄)
+
+**2026-08-16 첫 배포에서 실제로 발생한 증상이다.** 환경변수 없이 빌드가 돌아간 것이
+원인이다.
+
+확인 방법 — 미들웨어가 제외하는 경로는 정상이면 확진이다.
+
+| 경로 | 정상 배포 | 이 증상일 때 |
+|---|---|---|
+| `/`, `/auth/login` | 200 | **500** |
+| `/manifest.webmanifest`, `/icons/icon-192.png`, `/serwist/sw.js` | 200 | 200 |
+
+정적 자원은 살아있고 미들웨어(`proxy.ts`)를 타는 경로만 죽는다. 미들웨어가 매 요청마다
+`createServerClient(undefined, undefined)`를 호출하다 예외를 던지기 때문이다.
+
+**해결:** 2번의 환경변수를 넣은 뒤 **반드시 재배포한다.** 값만 추가하고 새로고침하면
+아무 것도 바뀌지 않는다 — `NEXT_PUBLIC_*`는 빌드 시점에 코드로 인라인되므로 기존
+배포에는 여전히 `undefined`가 박혀 있다.
+
+Vercel Deployments → 최신 배포 → `⋯` → **Redeploy**. 이때 *Use existing Build Cache*는
+**끄는 것**이 안전하다.
+
+> 지금은 `next.config.ts`가 환경변수 없는 빌드를 아예 실패시킨다(2026-08-16 추가).
+> 그러니 이 증상이 다시 나오면 환경변수 문제가 아니라 다른 원인이다 — Vercel
+> Deployments의 **Runtime Logs**에서 실제 예외를 확인한다.
+
 ## 4. 배포 후 확인
 
 브라우저에서 배포 URL을 열고 아래를 확인한다.

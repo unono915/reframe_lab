@@ -81,6 +81,8 @@ next-env.d.ts
 # ------------------------------------------------------------
 /playwright-report/
 /test-results/
+# Playwright storageState — 실제 로그인 세션 쿠키가 담긴다(tests/e2e/global-setup.ts).
+tests/e2e/.auth/
 /blob-report/
 
 # ------------------------------------------------------------

@@ -67,6 +67,7 @@ export function createMemorySessionRepository(): SessionRepository {
           lastActiveStage: null,
           stateVersion: 0,
           aiCallCount: 0,
+          originSessionId: params.originSessionId,
           startedAt: now,
           lastActiveAt: now,
           createdAt: now,
@@ -118,6 +119,11 @@ export function createMemorySessionRepository(): SessionRepository {
         .sort((a, b) => b.session.startedAt.localeCompare(a.session.startedAt))
         .slice(0, limit)
         .map((s) => s.session.templateId);
+    },
+
+    async deleteSession(sessionId: string): Promise<void> {
+      const db = await getDB();
+      await db.delete(STORE_NAME, sessionId);
     },
   };
 }

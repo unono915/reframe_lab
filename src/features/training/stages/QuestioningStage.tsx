@@ -14,6 +14,7 @@ export function QuestioningStage() {
     markPriorityQuestion,
     requestHint,
     submitExceptionReason,
+    awaitLatestSnapshot,
     advance,
   } = useTrainingSession();
   const [text, setText] = useState("");
@@ -25,7 +26,6 @@ export function QuestioningStage() {
 
   if (!snapshot) return null;
   const questions = snapshot.questions.filter((q) => q.authorType === "user");
-  const hasPriority = questions.some((q) => q.isPriority);
 
   async function handleAdd() {
     if (!text.trim()) return;
@@ -54,8 +54,14 @@ export function QuestioningStage() {
   }
 
   async function handlePrimaryAction() {
-    if (questions.length < 3 || !hasPriority) {
-      if (questions.length >= 1 && hintLevel >= 2 && exceptionReason.trim()) {
+    // 직전 질문 추가·핵심 질문 선택이 아직 큐에서 처리 중일 수 있으므로, 판단
+    // 직전에 큐가 비워질 때까지 기다려 최신 상태로 다시 센다(원칙 7과 같은 종류의 버그).
+    const latest = await awaitLatestSnapshot();
+    const latestQuestions =
+      latest?.questions.filter((q) => q.authorType === "user") ?? questions;
+    const latestHasPriority = latestQuestions.some((q) => q.isPriority);
+    if (latestQuestions.length < 3 || !latestHasPriority) {
+      if (latestQuestions.length >= 1 && hintLevel >= 2 && exceptionReason.trim()) {
         await submitExceptionReason(EXCEPTION_PROMPT_KEYS.questioning, exceptionReason);
       } else {
         return {

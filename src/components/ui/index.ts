@@ -4,6 +4,8 @@ export { Card } from "./Card";
 export type { CardProps, CardVariant } from "./Card";
 export { Field } from "./Field";
 export type { FieldProps } from "./Field";
+export { Input, PasswordInput } from "./Input";
+export type { InputProps, PasswordInputProps } from "./Input";
 export { Stack } from "./Stack";
 export type { SpaceStep, StackProps } from "./Stack";
 export { Textarea } from "./Textarea";

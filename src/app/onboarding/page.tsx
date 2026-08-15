@@ -23,7 +23,7 @@ export default function OnboardingPage() {
         </div>
       </div>
       <div className="px-6 pb-6">
-        <LinkButton href="/" variant="primary" fullWidth>
+        <LinkButton href="/auth/login" variant="primary" fullWidth>
           시작하기
         </LinkButton>
       </div>

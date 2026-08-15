@@ -38,8 +38,11 @@ const layerBoundaries = [
           patterns: [
             "next",
             "next/*",
+            "@supabase/*",
             "@/lib/repositories/*",
             "@/lib/ai/*",
+            "@/lib/supabase/*",
+            "@/lib/auth/*",
             "@/features/*",
             "@/components/*",
             "@/app/*",
@@ -73,27 +76,36 @@ const layerBoundaries = [
     },
   },
   {
+    /**
+     * `features/`·`components/`는 Supabase SDK를 직접 만지지 않는다. 로그인·가입 등은
+     * `lib/auth/`가 제공하는 얇은 함수를 통해서만 호출한다 — repositories/ai와 같은
+     * Adapter 경계 원칙을 인증에도 동일하게 적용한다.
+     */
     files: ["src/features/**/*.{ts,tsx}", "src/components/**/*.{ts,tsx}"],
     rules: {
       "no-restricted-imports": [
         "error",
         {
-          patterns: ["@/lib/repositories/*", "@/lib/ai/*"],
+          patterns: ["@/lib/repositories/*", "@/lib/ai/*", "@/lib/supabase/*", "@supabase/*"],
         },
       ],
     },
   },
   {
     /**
-     * Phase 2 한정 예외. TrainingSessionProvider는 아직 `app/api/**`가 없는 상태에서
-     * 인메모리 Repository와 Mock Coach를 직접 오케스트레이션하는 것이 Phase 2의 실제
-     * 목표다(DEVELOPMENT_PLAN.md §10 Phase 2 구현 대상). Phase 3에서 Route Handler가
-     * 생기면 이 Provider는 fetch('/api/sessions/...')로 바꾸고 이 override를 지운다 —
-     * 그 전까지 다른 features/ 코드가 같은 지름길을 쓰지 못하게 이 파일 하나로 좁혀둔다.
+     * Phase 3에서 좁아진 예외. Repository 직접 호출은 사라지고 fetch('/api/sessions/...')로
+     * 바뀌었다(더 이상 `@/lib/repositories/*` 접근 불필요 — 이 override에서 뺐다). 남은
+     * `@/lib/ai/*`(Mock Coach) 허용은 Phase 4에서 `app/api/sessions/[id]/coach` Route
+     * Handler가 생기면 requestHint/requestFeedback을 fetch로 바꾸고 완전히 지운다.
      */
     files: ["src/features/training/TrainingSessionProvider.tsx"],
     rules: {
-      "no-restricted-imports": "off",
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: ["@/lib/repositories/*", "@/lib/supabase/*", "@supabase/*"],
+        },
+      ],
     },
   },
 ];

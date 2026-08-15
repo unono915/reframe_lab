@@ -108,16 +108,32 @@ export async function clearSessionDrafts(sessionId: string): Promise<void> {
   await tx.done;
 }
 
+export interface DebouncedDraftSaver {
+  (params: SaveDraftParams): void;
+  /**
+   * 대기 중인 저장을 실행하지 않고 취소한다. 다음 단계로 넘어가는 순간(advance) 이
+   * 없으면, debounce 타이머가 전환 이후에 뒤늦게 발동해 이미 지나간 단계의 초안을
+   * 되살려 놓는 경쟁 상태가 생긴다 — 실제 Playwright E2E로 재현했다(원칙 7과 같은 종류의 버그).
+   */
+  cancelPending: () => void;
+}
+
 /**
  * 입력 변화마다 즉시 쓰지 않고 마지막 변경 후 delayMs가 지나면 한 번만 저장한다.
  * React에 종속되지 않은 순수 클로저라 `features/training`의 어떤 훅에서도 재사용할 수 있다.
  */
-export function createDebouncedDraftSaver(delayMs = 500) {
+export function createDebouncedDraftSaver(delayMs = 500): DebouncedDraftSaver {
   let timer: ReturnType<typeof setTimeout> | undefined;
-  return function debouncedSave(params: SaveDraftParams): void {
+  const debouncedSave = (params: SaveDraftParams): void => {
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => {
+      timer = undefined;
       void saveDraft(params);
     }, delayMs);
   };
+  debouncedSave.cancelPending = () => {
+    if (timer) clearTimeout(timer);
+    timer = undefined;
+  };
+  return debouncedSave;
 }

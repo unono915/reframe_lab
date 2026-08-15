@@ -12,61 +12,61 @@ import {
 import type { ReactNode } from "react";
 import type {
   AIFeedback,
-  CoachInteraction,
   HintLevel,
   TrainingSessionSnapshot,
   TrainingTemplate,
 } from "@/domain/types";
-import {
-  buildObservation,
-  buildObservationItem,
-  buildPerspective,
-  buildProblemDefinitionVersion,
-  buildQuestion,
-  buildReframe,
-  buildStageResponse,
-  type ObservationDraft,
-  type ObservationItemDraft,
-  type PerspectiveDraft,
-  type ProblemDefinitionDraft,
-  type QuestionDraft,
-  type ReframeDraft,
+import type {
+  ObservationDraft,
+  ObservationItemDraft,
+  PerspectiveDraft,
+  ProblemDefinitionDraft,
+  QuestionDraft,
+  ReframeDraft,
 } from "@/domain/training/builders";
-import {
-  advanceStage,
-  canAdvance as computeCanAdvance,
-  pauseSession as pauseSessionTransition,
-  resumeSession as resumeSessionTransition,
-} from "@/domain/training/state-machine";
-import { applyStaleness, computeStaleArtifacts } from "@/domain/training/staleness";
-import {
-  EXCEPTION_PROMPT_KEYS,
-  FEEDBACK_SELF_CHECK_PROMPT_KEY,
-} from "@/domain/training/requirements";
-import { selectTemplateForDate } from "@/domain/templates/selection";
-import { sessionRepository, templateRepository } from "@/lib/repositories/memory";
+import { canAdvance as computeCanAdvance } from "@/domain/training/state-machine";
+import { STAGE_ORDER } from "@/domain/training/stages";
+import { EXCEPTION_PROMPT_KEYS } from "@/domain/training/requirements";
 import {
   clearSessionDrafts,
   createDebouncedDraftSaver,
+  deleteDraft,
   getDraft,
+  getDraftsForSession,
+  type DraftRecord,
 } from "@/lib/persistence/drafts";
+import { findConflictingDrafts } from "@/lib/persistence/reconciliation";
 import { mockCoachProvider } from "@/lib/ai/providers/mock";
+import type { MutateAction } from "@/lib/schemas/mutate-actions";
+import type { CoachOutputSchema } from "@/lib/schemas/coach-output";
+import type { explorationPromptKeySchema } from "@/lib/schemas/stage-input";
+import type { z } from "zod";
 
 /**
- * §9-C(인증 정책)가 결정될 때까지 고정 Mock User로 진행한다(DEVELOPMENT_PLAN.md §15.1 A3).
- * 시간대도 §14-C 이전까지 고정값을 쓴다.
+ * Phase 3부터는 실제 로그인 사용자의 브라우저 시간대를 쓴다 — §14-C 이전까지 썼던
+ * 고정 Mock 값은 폐기됐다. userId는 서버가 세션 쿠키에서 얻으므로 클라이언트가
+ * 보낼 필요가 없다(DEVELOPMENT_PLAN.md §6.3 원칙 6).
  */
-export const MOCK_USER_ID = "mock-user-1";
-export const MOCK_TIMEZONE = "Asia/Seoul";
+function detectTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+}
 
-function todayDateString(timezone: string): string {
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  return formatter.format(new Date());
+interface ApiErrorBody {
+  errorCode: string;
+  message: string;
+  snapshot?: TrainingSessionSnapshot;
+}
+
+async function parseJsonSafe<T>(response: Response): Promise<T | null> {
+  try {
+    return (await response.json()) as T;
+  } catch {
+    return null;
+  }
 }
 
 interface State {
@@ -74,31 +74,32 @@ interface State {
   snapshot: TrainingSessionSnapshot | null;
   template: TrainingTemplate | null;
   errorMessage: string | null;
+  conflictingDrafts: DraftRecord[];
 }
 
 type Action =
   | { type: "loading" }
-  | {
-      type: "ready";
-      snapshot: TrainingSessionSnapshot;
-      template: TrainingTemplate | null;
-    }
+  | { type: "ready"; snapshot: TrainingSessionSnapshot; template: TrainingTemplate | null; conflictingDrafts: DraftRecord[] }
   | { type: "snapshotUpdated"; snapshot: TrainingSessionSnapshot }
+  | { type: "conflictsUpdated"; conflictingDrafts: DraftRecord[] }
   | { type: "error"; message: string };
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case "loading":
-      return { status: "loading", snapshot: null, template: null, errorMessage: null };
+      return { status: "loading", snapshot: null, template: null, errorMessage: null, conflictingDrafts: [] };
     case "ready":
       return {
         status: "ready",
         snapshot: action.snapshot,
         template: action.template,
         errorMessage: null,
+        conflictingDrafts: action.conflictingDrafts,
       };
     case "snapshotUpdated":
       return { ...state, snapshot: action.snapshot };
+    case "conflictsUpdated":
+      return { ...state, conflictingDrafts: action.conflictingDrafts };
     case "error":
       return { ...state, status: "error", errorMessage: action.message };
   }
@@ -110,6 +111,17 @@ export interface TrainingSessionContextValue {
   template: TrainingTemplate | null;
   errorMessage: string | null;
   canAdvance: boolean;
+  conflictingDrafts: DraftRecord[];
+  dismissConflictingDraft: (draft: DraftRecord) => Promise<void>;
+  /**
+   * mutate 큐가 비워질 때까지 기다린 뒤 그 시점의 스냅샷을 반환한다. 각 단계
+   * 컴포넌트의 handlePrimaryAction이 "3개 이상 썼는가" 같은 조건을 React state
+   * (`snapshot`)로 판단하면, 방금 클릭한 addQuestion/markPriorityQuestion이 아직
+   * 큐에서 처리 중일 때 그 판단이 오래된 값을 볼 수 있다 — 실제 네트워크 왕복이 생긴
+   * Phase 3부터 이 창이 커져 Playwright로 재현됐다(빠른 연속 클릭). 조건 판단 직전에
+   * 이 함수로 큐 완료를 기다리면 항상 최신 값을 보게 된다.
+   */
+  awaitLatestSnapshot: () => Promise<TrainingSessionSnapshot | null>;
   advance: () => Promise<{ ok: true } | { ok: false; message: string }>;
   pause: () => Promise<void>;
   saveDraft: (promptKey: string, content: string) => void;
@@ -137,9 +149,7 @@ const TrainingSessionContext = createContext<TrainingSessionContextValue | null>
 export function useTrainingSession(): TrainingSessionContextValue {
   const ctx = useContext(TrainingSessionContext);
   if (!ctx) {
-    throw new Error(
-      "useTrainingSession은 TrainingSessionProvider 안에서만 쓸 수 있습니다.",
-    );
+    throw new Error("useTrainingSession은 TrainingSessionProvider 안에서만 쓸 수 있습니다.");
   }
   return ctx;
 }
@@ -150,16 +160,13 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
     snapshot: null,
     template: null,
     errorMessage: null,
+    conflictingDrafts: [],
   });
 
   const debouncedSaveRef = useRef(createDebouncedDraftSaver(500));
+  const timezoneRef = useRef(detectTimezone());
 
-  /**
-   * React state는 렌더에만 쓴다. 같은 이벤트 핸들러 안에서 "저장 → 바로 이어서 전환 검사"처럼
-   * 연속으로 mutate를 호출하는 코드(예: submitObservation 후 advance)는 dispatch가 아직
-   * 반영되지 않은 상태(state.snapshot)를 읽는 stale closure 문제를 만든다. 이 ref가 항상
-   * "방금 저장한 최신값"을 동기적으로 들고 있어서 그 문제를 없앤다.
-   */
+  /** stale closure 방지용 최신 스냅샷 캐시 — Phase 2부터 이어지는 패턴(원칙 7). */
   const snapshotRef = useRef<TrainingSessionSnapshot | null>(null);
 
   const commit = useCallback((snapshot: TrainingSessionSnapshot) => {
@@ -168,14 +175,10 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /**
-   * 모든 스냅샷 변형(mutate/advance/pause)은 이 큐를 통해서만 실행한다. IndexedDB
-   * 저장은 진짜 비동기라, 두 mutate가 겹쳐 호출되면(예: "추가하기"를 연속 클릭) 뒤의
-   * 호출이 앞의 저장이 끝나기 전의 snapshotRef를 읽어 방금 추가한 항목을 덮어써
-   * 잃어버릴 수 있다 — 실제 Playwright E2E로 재현했다(질문/재정의 연속 추가 시 첫
-   * 항목 유실). 큐로 직렬화하면 호출 속도와 무관하게 항상 최신 상태 위에서 계산한다.
+   * 서버 왕복이 생겼으니 겹쳐 호출될 위험은 Phase 2보다 더 커졌다 — 큐로 직렬화하는
+   * 이유는 그대로다(연속 클릭 시 먼저 온 응답이 늦게 온 요청의 스냅샷을 덮어쓰는 것 방지).
    */
   const mutationQueueRef = useRef<Promise<unknown>>(Promise.resolve());
-
   const enqueue = useCallback(<T,>(task: () => Promise<T>): Promise<T> => {
     const run = mutationQueueRef.current.then(task, task);
     mutationQueueRef.current = run.then(
@@ -185,55 +188,136 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
     return run;
   }, []);
 
+  const callMutate = useCallback(
+    (mutation: MutateAction): Promise<TrainingSessionSnapshot | null> =>
+      enqueue(async () => {
+        const current = snapshotRef.current;
+        if (!current) return null;
+        const response = await fetch(`/api/sessions/${current.session.id}/mutate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clientRequestId: crypto.randomUUID(), mutation }),
+        });
+        const body = await parseJsonSafe<{ snapshot: TrainingSessionSnapshot }>(response);
+        if (!response.ok || !body) return current;
+        commit(body.snapshot);
+        return body.snapshot;
+      }),
+    [enqueue, commit],
+  );
+
+  const canAdvance = useMemo(
+    () => (state.snapshot ? computeCanAdvance(state.snapshot) : false),
+    [state.snapshot],
+  );
+
+  const callTransition = useCallback(
+    (endpoint: "advance" | "pause" | "resume" | "abandon"): Promise<{ ok: true } | { ok: false; message: string }> =>
+      enqueue(async () => {
+        const current = snapshotRef.current;
+        if (!current) return { ok: false, message: "세션이 아직 준비되지 않았습니다." };
+
+        if (endpoint === "advance") {
+          debouncedSaveRef.current.cancelPending();
+          await clearSessionDrafts(current.session.id);
+        }
+
+        const response = await fetch(`/api/sessions/${current.session.id}/${endpoint}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            expectedStateVersion: current.session.stateVersion,
+            clientRequestId: crypto.randomUUID(),
+          }),
+        });
+        const body = await parseJsonSafe<{ snapshot: TrainingSessionSnapshot } & Partial<ApiErrorBody>>(
+          response,
+        );
+        if (!body) return { ok: false, message: "저장하지 못했습니다. 작성한 내용은 그대로 있어요." };
+
+        // 실패 응답도 서버가 함께 보내주는 최신 스냅샷으로 갱신한다 — 다른 기기가 먼저
+        // 진행시킨 경우 이 기기도 그 최신 상태를 즉시 보게 된다(§7.3 409 규약).
+        const returnedSnapshot = "snapshot" in body ? body.snapshot : undefined;
+        if (returnedSnapshot) commit(returnedSnapshot);
+
+        if (!response.ok) {
+          return { ok: false, message: body.message ?? "지금은 이 동작을 할 수 없어요." };
+        }
+        return { ok: true };
+      }),
+    [enqueue, commit],
+  );
+
+  const awaitLatestSnapshot = useCallback(
+    () => enqueue(async () => snapshotRef.current),
+    [enqueue],
+  );
+
+  const advance = useCallback(() => callTransition("advance"), [callTransition]);
+  const pause = useCallback(async () => {
+    await callTransition("pause");
+  }, [callTransition]);
+
   useEffect(() => {
     let cancelled = false;
+
+    async function loadTemplateFor(session: TrainingSessionSnapshot["session"]) {
+      const res = await fetch("/api/templates");
+      const body = await parseJsonSafe<{ templates: TrainingTemplate[] }>(res);
+      return body?.templates.find((t) => t.id === session.templateId) ?? null;
+    }
 
     async function init() {
       dispatch({ type: "loading" });
       try {
-        const existing = await sessionRepository.getActiveSessionForUser(MOCK_USER_ID);
-        let snapshot = existing;
+        const activeRes = await fetch("/api/sessions?status=active");
+        const activeBody = await parseJsonSafe<{ snapshot: TrainingSessionSnapshot | null }>(activeRes);
+        let snapshot = activeBody?.snapshot ?? null;
+
         if (!snapshot) {
-          const templates = await templateRepository.listActiveTemplates();
-          const recentTemplateIds = await sessionRepository.listRecentTemplateIds(
-            MOCK_USER_ID,
-            5,
-          );
-          const chosen = selectTemplateForDate({
-            date: todayDateString(MOCK_TIMEZONE),
-            userId: MOCK_USER_ID,
-            templates,
-            recentTemplateIds,
+          const timezone = timezoneRef.current;
+          const todayRes = await fetch(`/api/templates/today?timezone=${encodeURIComponent(timezone)}`);
+          const todayBody = await parseJsonSafe<{ template: TrainingTemplate }>(todayRes);
+          if (!todayBody) throw new Error("오늘의 렌즈를 불러오지 못했습니다.");
+
+          const createRes = await fetch("/api/sessions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              clientGeneratedId: crypto.randomUUID(),
+              templateId: todayBody.template.id,
+              timezone,
+              clientRequestId: crypto.randomUUID(),
+            }),
           });
-          snapshot = await sessionRepository.createSession({
-            userId: MOCK_USER_ID,
-            templateId: chosen.id,
-            trainingDate: todayDateString(MOCK_TIMEZONE),
-            timezone: MOCK_TIMEZONE,
-            clientGeneratedId: crypto.randomUUID(),
+          const createBody = await parseJsonSafe<{ snapshot: TrainingSessionSnapshot }>(createRes);
+          if (!createRes.ok || !createBody) throw new Error("세션을 시작하지 못했습니다.");
+          snapshot = createBody.snapshot;
+        } else if (snapshot.session.status === "paused") {
+          // /training 진입 자체가 "이어서 하기" 행동이다.
+          const resumeRes = await fetch(`/api/sessions/${snapshot.session.id}/resume`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              expectedStateVersion: snapshot.session.stateVersion,
+              clientRequestId: crypto.randomUUID(),
+            }),
           });
+          const resumeBody = await parseJsonSafe<{ snapshot: TrainingSessionSnapshot }>(resumeRes);
+          if (resumeBody) snapshot = resumeBody.snapshot;
         }
 
-        // /training 진입 자체가 "이어서 하기" 행동이다 — 보류 상태였다면 여기서 재개한다.
-        if (snapshot.session.status === "paused") {
-          const resumed = resumeSessionTransition(
-            snapshot.session,
-            snapshot.session.stateVersion,
-          );
-          if (resumed.ok) {
-            snapshot = await sessionRepository.saveSnapshot({
-              ...snapshot,
-              session: resumed.session,
-            });
-          }
-        }
+        const template = await loadTemplateFor(snapshot.session);
+        const localDrafts = await getDraftsForSession(snapshot.session.id);
+        const conflictingDrafts = findConflictingDrafts(
+          localDrafts,
+          snapshot.session.currentStage,
+          STAGE_ORDER,
+        );
 
-        const templates = await templateRepository.listActiveTemplates();
-        const template =
-          templates.find((t) => t.id === snapshot.session.templateId) ?? null;
         if (!cancelled) {
           snapshotRef.current = snapshot;
-          dispatch({ type: "ready", snapshot, template });
+          dispatch({ type: "ready", snapshot, template, conflictingDrafts });
         }
       } catch (err) {
         if (!cancelled) {
@@ -251,65 +335,16 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  /** 스냅샷을 순수 함수로 변형하고, 저장소에 반영한 뒤 상태를 갱신하는 공용 헬퍼. */
-  const mutate = useCallback(
-    (
-      fn: (current: TrainingSessionSnapshot) => TrainingSessionSnapshot,
-    ): Promise<TrainingSessionSnapshot | null> =>
-      enqueue(async () => {
-        const current = snapshotRef.current;
-        if (!current) return null;
-        const next = fn(current);
-        const saved = await sessionRepository.saveSnapshot(next);
-        commit(saved);
-        return saved;
-      }),
-    [enqueue, commit],
-  );
-
-  const canAdvance = useMemo(
-    () => (state.snapshot ? computeCanAdvance(state.snapshot) : false),
-    [state.snapshot],
-  );
-
-  const advance = useCallback(
-    (): Promise<{ ok: true } | { ok: false; message: string }> =>
-      enqueue(async () => {
-        const current = snapshotRef.current;
-        if (!current) return { ok: false, message: "세션이 아직 준비되지 않았습니다." };
-        const result = advanceStage(current, current.session.stateVersion);
-        if (!result.ok) return { ok: false, message: result.message };
-
-        // 다음 단계로 넘어가기 전 확정된 초안은 더 이상 필요 없다 — 이 stage의 draft를 지운다.
-        await clearSessionDrafts(current.session.id);
-        const saved = await sessionRepository.saveSnapshot({
-          ...current,
-          session: result.session,
-        });
-        commit(saved);
-        return { ok: true };
-      }),
-    [enqueue, commit],
-  );
-
-  const pause = useCallback(
-    () =>
-      enqueue(async () => {
-        const current = snapshotRef.current;
-        if (!current) return;
-        const result = pauseSessionTransition(
-          current.session,
-          current.session.stateVersion,
-        );
-        if (!result.ok) return;
-        const saved = await sessionRepository.saveSnapshot({
-          ...current,
-          session: result.session,
-        });
-        commit(saved);
-      }),
-    [enqueue, commit],
-  );
+  const dismissConflictingDraft = useCallback(async (draft: DraftRecord) => {
+    await deleteDraft(draft.sessionId, draft.stage, draft.promptKey);
+    dispatch({
+      type: "conflictsUpdated",
+      conflictingDrafts: (snapshotRef.current
+        ? await getDraftsForSession(snapshotRef.current.session.id)
+        : []
+      ).filter((d) => !(d.stage === draft.stage && d.promptKey === draft.promptKey)),
+    });
+  }, []);
 
   const saveDraft = useCallback((promptKey: string, content: string) => {
     const current = snapshotRef.current;
@@ -325,158 +360,77 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
   const loadDraft = useCallback(async (promptKey: string) => {
     const current = snapshotRef.current;
     if (!current) return undefined;
-    const draft = await getDraft(
-      current.session.id,
-      current.session.currentStage,
-      promptKey,
-    );
+    const draft = await getDraft(current.session.id, current.session.currentStage, promptKey);
     return draft?.content;
   }, []);
 
-  /**
-   * 이전 단계를 다시 수정했을 때 그 이후에 쌓인 AI 산출물을 stale로 표시한다
-   * (domain/training/staleness.ts §7.4). 현재 편집 중인 stage보다 앞선 단계를 고친
-   * 경우에만 의미가 있다 — 지금 단계 자체를 채우는 것은 staleness 대상이 아니다.
-   */
-  const propagateStalenessIfEditingPastStage = useCallback(
-    (
-      current: TrainingSessionSnapshot,
-      editedStage: TrainingSessionSnapshot["session"]["currentStage"],
-    ) => {
-      if (editedStage === current.session.currentStage) return current;
-      const computation = computeStaleArtifacts(editedStage, current);
-      const patch = applyStaleness(current, computation);
-      return { ...current, ...patch };
-    },
-    [],
-  );
-
   const submitObservation = useCallback(
     async (input: ObservationDraft) => {
-      await mutate((current) => {
-        const observation = buildObservation(
-          current.session.id,
-          input,
-          current.observation,
-        );
-        const withStale = propagateStalenessIfEditingPastStage(current, "observation");
-        return { ...withStale, observation };
-      });
+      await callMutate({ action: "submitObservation", args: input });
     },
-    [mutate, propagateStalenessIfEditingPastStage],
+    [callMutate],
   );
 
   const addObservationItem = useCallback(
     async (input: ObservationItemDraft) => {
-      await mutate((current) => {
-        if (!current.observation) return current;
-        const item = buildObservationItem(
-          current.observation.id,
-          input,
-          current.observationItems.length,
-        );
-        return { ...current, observationItems: [...current.observationItems, item] };
-      });
+      await callMutate({ action: "addObservationItem", args: input });
     },
-    [mutate],
+    [callMutate],
   );
 
   const confirmObservationItem = useCallback(
     async (itemId: string, confirmed: boolean) => {
-      await mutate((current) => ({
-        ...current,
-        observationItems: current.observationItems.map((item) =>
-          item.id === itemId ? { ...item, userConfirmed: confirmed } : item,
-        ),
-      }));
+      await callMutate({ action: "confirmObservationItem", args: { itemId, confirmed } });
     },
-    [mutate],
+    [callMutate],
   );
 
   const addQuestion = useCallback(
     async (input: QuestionDraft, hintLevelUsed: HintLevel) => {
-      await mutate((current) => {
-        const question = {
-          ...buildQuestion(current.session.id, input, current.questions.length),
-          hintLevelUsed,
-        };
-        return { ...current, questions: [...current.questions, question] };
-      });
+      await callMutate({ action: "addQuestion", args: { input, hintLevelUsed } });
     },
-    [mutate],
+    [callMutate],
   );
 
   const markPriorityQuestion = useCallback(
     async (questionId: string, reason: string) => {
-      await mutate((current) => ({
-        ...current,
-        questions: current.questions.map((q) =>
-          q.id === questionId
-            ? { ...q, isPriority: true, priorityReason: reason }
-            : { ...q, isPriority: false, priorityReason: undefined },
-        ),
-      }));
+      await callMutate({
+        action: "markPriorityQuestion",
+        args: { questionId, priorityReason: reason },
+      });
     },
-    [mutate],
+    [callMutate],
   );
 
   const addExplorationResponse = useCallback(
     async (promptKey: string, content: string) => {
-      await mutate((current) => {
-        const response = buildStageResponse(current.session.id, "exploration", {
-          promptKey,
-          content,
-        });
-        const withoutOld = current.stageResponses.filter(
-          (r) => !(r.stage === "exploration" && r.promptKey === promptKey),
-        );
-        return { ...current, stageResponses: [...withoutOld, response] };
+      await callMutate({
+        action: "addExplorationResponse",
+        args: { promptKey: promptKey as z.infer<typeof explorationPromptKeySchema>, content },
       });
     },
-    [mutate],
+    [callMutate],
   );
 
   const addPerspective = useCallback(
     async (input: PerspectiveDraft) => {
-      await mutate((current) => {
-        const perspective = buildPerspective(
-          current.session.id,
-          input,
-          current.perspectives.length,
-        );
-        return { ...current, perspectives: [...current.perspectives, perspective] };
-      });
+      await callMutate({ action: "addPerspective", args: input });
     },
-    [mutate],
+    [callMutate],
   );
 
   const addReframe = useCallback(
     async (input: ReframeDraft, hintLevelUsed: HintLevel) => {
-      await mutate((current) => {
-        const reframe = buildReframe(current.session.id, input, current.reframes.length);
-        void hintLevelUsed; // Reframe에는 hintLevel 필드가 없다 — Question과 달리 재정의는 힌트 사용을 별도로 추적하지 않는다.
-        return { ...current, reframes: [...current.reframes, reframe] };
-      });
+      await callMutate({ action: "addReframe", args: { input, hintLevelUsed } });
     },
-    [mutate],
+    [callMutate],
   );
 
   const submitDefinition = useCallback(
     async (input: ProblemDefinitionDraft) => {
-      await mutate((current) => {
-        const version = buildProblemDefinitionVersion(
-          current.session.id,
-          input,
-          current.problemDefinitionVersions,
-        );
-        const withStale = propagateStalenessIfEditingPastStage(current, "definition");
-        return {
-          ...withStale,
-          problemDefinitionVersions: [...withStale.problemDefinitionVersions, version],
-        };
-      });
+      await callMutate({ action: "submitDefinition", args: input });
     },
-    [mutate, propagateStalenessIfEditingPastStage],
+    [callMutate],
   );
 
   const submitExceptionReason = useCallback(
@@ -484,30 +438,14 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
       promptKey: (typeof EXCEPTION_PROMPT_KEYS)[keyof typeof EXCEPTION_PROMPT_KEYS],
       content: string,
     ) => {
-      await mutate((current) => {
-        const response = buildStageResponse(
-          current.session.id,
-          current.session.currentStage,
-          {
-            promptKey,
-            content,
-          },
-        );
-        return { ...current, stageResponses: [...current.stageResponses, response] };
-      });
+      await callMutate({ action: "submitExceptionReason", args: { promptKey, content } });
     },
-    [mutate],
+    [callMutate],
   );
 
   const completeSelfCheck = useCallback(async () => {
-    await mutate((current) => {
-      const response = buildStageResponse(current.session.id, "feedback", {
-        promptKey: FEEDBACK_SELF_CHECK_PROMPT_KEY,
-        content: "confirmed",
-      });
-      return { ...current, stageResponses: [...current.stageResponses, response] };
-    });
-  }, [mutate]);
+    await callMutate({ action: "completeSelfCheck", args: {} });
+  }, [callMutate]);
 
   const requestHint = useCallback(
     async (hintLevel: HintLevel): Promise<string> => {
@@ -518,30 +456,25 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
         hintLevel,
         userText: current.observation?.rawText ?? "",
       });
-      const interaction: CoachInteraction = {
-        id: crypto.randomUUID(),
-        sessionId: current.session.id,
-        stage: current.session.currentStage,
-        validatedOutput: output,
-        action: output.action,
-        hintLevel,
-        provider: mockCoachProvider.provider,
-        model: mockCoachProvider.model,
-        promptVersion: mockCoachProvider.promptVersion,
-        schemaVersion: mockCoachProvider.schemaVersion,
-        latencyMs: 0,
-        status: "ok",
-        isStale: false,
-        createdAt: new Date().toISOString(),
-      };
-      await mutate((snap) => ({
-        ...snap,
-        coachInteractions: [...snap.coachInteractions, interaction],
-        session: { ...snap.session, aiCallCount: snap.session.aiCallCount + 1 },
-      }));
+      await callMutate({
+        action: "recordCoachInteraction",
+        args: {
+          hintLevel,
+          // Training 중에는 currentStage가 "not_started"일 수 없다 — CoachOutput의
+          // Stage 타입은 domain/types.ts 전체를 쓰지만, coachOutputSchema는 활성
+          // 7단계만 받는다. 이 호출 지점에서는 항상 활성 세션 중이므로 안전하다.
+          output: output as CoachOutputSchema,
+          provider: mockCoachProvider.provider,
+          model: mockCoachProvider.model,
+          promptVersion: mockCoachProvider.promptVersion,
+          schemaVersion: mockCoachProvider.schemaVersion,
+          latencyMs: 0,
+          status: "ok",
+        },
+      });
       return output.question ?? "";
     },
-    [mutate],
+    [callMutate],
   );
 
   const requestFeedback = useCallback(async (): Promise<AIFeedback | null> => {
@@ -552,33 +485,23 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
     >((max, v) => (!max || v.versionNumber > max.versionNumber ? v : max), null);
     if (!latest) return null;
 
-    // 결정론적 Mock 피드백. 사용자가 실제로 쓴 문장을 그대로 인용해 근거를 만든다
-    // (PRD §7.7 "사용자 문장에서 인용하거나 정확히 지칭할 수 있는 근거").
     const quote = latest.text.length > 60 ? `${latest.text.slice(0, 60)}…` : latest.text;
-    const feedback: AIFeedback = {
-      id: crypto.randomUUID(),
-      sessionId: current.session.id,
+    const feedbackArgs = {
       problemDefinitionVersionId: latest.id,
       dimensions: {},
       strength: `"${quote}"처럼 실제 문장에서 출발한 점이 좋아요.`,
       improvementFocus: "아직 확인하지 못한 사람들의 입장도 있는지 살펴보면 더 좋아요.",
-      unverifiedAssumption:
-        "지금 든 원인이 유일한 원인이라고 단정하지 않았는지 확인해보세요.",
+      unverifiedAssumption: "지금 든 원인이 유일한 원인이라고 단정하지 않았는지 확인해보세요.",
       nextQuestion: "이 정의만 보고 다른 사람도 상황을 이해할 수 있을까요?",
       provider: mockCoachProvider.provider,
       model: mockCoachProvider.model,
       promptVersion: mockCoachProvider.promptVersion,
       schemaVersion: mockCoachProvider.schemaVersion,
-      isStale: false,
-      createdAt: new Date().toISOString(),
     };
-    await mutate((snap) => ({
-      ...snap,
-      aiFeedbacks: [...snap.aiFeedbacks, feedback],
-      session: { ...snap.session, aiCallCount: snap.session.aiCallCount + 1 },
-    }));
-    return feedback;
-  }, [mutate]);
+    const saved = await callMutate({ action: "recordAiFeedback", args: feedbackArgs });
+    const feedback = saved?.aiFeedbacks.at(-1);
+    return feedback ?? null;
+  }, [callMutate]);
 
   const value: TrainingSessionContextValue = {
     status: state.status,
@@ -586,6 +509,9 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
     template: state.template,
     errorMessage: state.errorMessage,
     canAdvance,
+    conflictingDrafts: state.conflictingDrafts,
+    dismissConflictingDraft,
+    awaitLatestSnapshot,
     advance,
     pause,
     saveDraft,
@@ -605,9 +531,5 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
     requestFeedback,
   };
 
-  return (
-    <TrainingSessionContext.Provider value={value}>
-      {children}
-    </TrainingSessionContext.Provider>
-  );
+  return <TrainingSessionContext.Provider value={value}>{children}</TrainingSessionContext.Provider>;
 }

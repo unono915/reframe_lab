@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Card, LinkButton, Stack } from "@/components/ui";
 import type { TrainingSessionSnapshot } from "@/domain/types";
-import { sessionRepository } from "@/lib/repositories/memory";
 
 /**
  * S-04 Problem Definition Result (DESIGN.md §10.4). "완료"보다 "현재의 정의"를 강조하고
@@ -17,12 +16,14 @@ export default function ResultPage() {
 
   useEffect(() => {
     let cancelled = false;
-    void sessionRepository.getSnapshot(params.sessionId).then((result) => {
-      if (!cancelled) {
-        setSnapshot(result);
-        setLoading(false);
-      }
-    });
+    void fetch(`/api/sessions/${params.sessionId}`)
+      .then((res) => (res.ok ? res.json() : { snapshot: null }))
+      .then((body: { snapshot: TrainingSessionSnapshot | null }) => {
+        if (!cancelled) {
+          setSnapshot(body.snapshot);
+          setLoading(false);
+        }
+      });
     return () => {
       cancelled = true;
     };

@@ -1,5 +1,14 @@
 import type { TrainingTemplate } from "@/domain/types";
 
+/**
+ * 사용자 시간대 기준 오늘 날짜(YYYY-MM-DD). 서버와 클라이언트 양쪽에서 같은 함수를
+ * 써야 "오늘의 렌즈"가 어긋나지 않는다 — `Intl`은 브라우저·Node 모두에 있는 표준
+ * 기능이라 domain/의 "프레임워크 의존 없음" 원칙을 어기지 않는다.
+ */
+export function todayDateString(timezone: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(new Date());
+}
+
 /** FNV-1a 32bit — 암호학적 용도가 아니라 결정론적 분산에만 쓴다. */
 function hashString(input: string): number {
   let hash = 0x811c9dc5;

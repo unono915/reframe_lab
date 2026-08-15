@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Card, Stack } from "@/components/ui";
-import type { TrainingSessionSnapshot } from "@/domain/types";
+import { Button, Card, PageState, Stack } from "@/components/ui";
+import type { SessionSummary } from "@/domain/types";
 import { computeGrowthMetrics, type GrowthMetrics } from "@/domain/growth/metrics";
+import { fetchJson } from "@/lib/fetch-json";
 
 function detectTimezone(): string {
   try {
@@ -20,6 +21,11 @@ function todayDateString(timezone: string): string {
 
 const MIN_SESSIONS_FOR_RHYTHM = 3;
 
+/** setState를 하지 않는 순수 로더 — 화면 상태 적용은 호출자가 한다. */
+function fetchGrowth() {
+  return fetchJson<{ sessions: SessionSummary[] }>("/api/history");
+}
+
 /**
  * S-07 Growth (DESIGN.md §10.7). 점수화·순위·경쟁 요소를 두지 않는다 — 꾸준함과
  * 재정의·수정 행동만 담담한 문장과 단순 Bar로 보여준다. 계산은 순수 함수
@@ -29,29 +35,38 @@ export default function GrowthPage() {
   const router = useRouter();
   const [metrics, setMetrics] = useState<GrowthMetrics | null>(null);
   const [latestSessionId, setLatestSessionId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const apply = useCallback((result: Awaited<ReturnType<typeof fetchGrowth>>) => {
+    if (!result.ok) {
+      setError(result.message);
+      return;
+    }
+    const timezone = detectTimezone();
+    setMetrics(computeGrowthMetrics(result.data.sessions, todayDateString(timezone)));
+    setLatestSessionId(result.data.sessions.find((s) => s.status === "completed")?.id ?? null);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
-    void fetch("/api/history")
-      .then((r) => r.json())
-      .then((body: { sessions: TrainingSessionSnapshot[] }) => {
-        if (cancelled) return;
-        const timezone = detectTimezone();
-        setMetrics(computeGrowthMetrics(body.sessions, todayDateString(timezone)));
-        const completed = body.sessions.find((s) => s.session.status === "completed");
-        setLatestSessionId(completed?.session.id ?? null);
-      });
+    void fetchGrowth().then((result) => {
+      if (!cancelled) apply(result);
+    });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [apply]);
 
+  function handleRetry() {
+    setError(null);
+    void fetchGrowth().then(apply);
+  }
+
+  if (error) {
+    return <PageState status="error" message={error} onRetry={handleRetry} />;
+  }
   if (metrics === null) {
-    return (
-      <main className="flex min-h-dvh items-center justify-center px-5">
-        <p className="text-body text-text-secondary">기록을 불러오고 있어요.</p>
-      </main>
-    );
+    return <PageState status="loading" loadingLabel="기록을 불러오고 있어요." />;
   }
 
   const maxWeekCount = Math.max(1, ...metrics.recentWeeks.map((w) => w.completedCount));

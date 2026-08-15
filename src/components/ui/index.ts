@@ -8,6 +8,7 @@ export { Field } from "./Field";
 export type { FieldProps } from "./Field";
 export { Input, PasswordInput } from "./Input";
 export type { InputProps, PasswordInputProps } from "./Input";
+export { PageState } from "./PageState";
 export { Stack } from "./Stack";
 export type { SpaceStep, StackProps } from "./Stack";
 export { Textarea } from "./Textarea";

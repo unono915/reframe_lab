@@ -1,5 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
-import type { TrainingSessionSnapshot } from "@/domain/types";
+import type { SessionSummary, TrainingSessionSnapshot } from "@/domain/types";
 import type { CreateSessionParams, SessionRepository } from "../types";
 
 /**
@@ -126,15 +126,39 @@ export function createMemorySessionRepository(): SessionRepository {
       await db.delete(STORE_NAME, sessionId);
     },
 
-    async listSessionsForUser(
+    async listSessionSummariesForUser(
       userId: string,
       limit = 100,
-    ): Promise<TrainingSessionSnapshot[]> {
+    ): Promise<SessionSummary[]> {
       const db = await getDB();
       const forUser = await db.getAllFromIndex(STORE_NAME, "byUser", userId);
       return forUser
         .sort((a, b) => b.session.startedAt.localeCompare(a.session.startedAt))
-        .slice(0, limit);
+        .slice(0, limit)
+        .map(toSummary);
     },
+  };
+}
+
+/**
+ * 인메모리 구현은 이미 스냅샷 전체를 들고 있으므로 축소만 하면 된다 — Supabase
+ * 구현과 달리 쿼리 비용 문제가 없다. 두 구현이 같은 필드를 채우는지가 중요하다.
+ */
+function toSummary(snapshot: TrainingSessionSnapshot): SessionSummary {
+  const latest = [...snapshot.problemDefinitionVersions].sort(
+    (a, b) => b.versionNumber - a.versionNumber,
+  )[0];
+  return {
+    id: snapshot.session.id,
+    trainingDate: snapshot.session.trainingDate,
+    status: snapshot.session.status,
+    templateId: snapshot.session.templateId,
+    originSessionId: snapshot.session.originSessionId,
+    observationText: snapshot.observation?.rawText ?? null,
+    latestDefinitionText: latest?.text ?? null,
+    userReframeCount: snapshot.reframes.filter((r) => r.authorType === "user").length,
+    hasUserRevisedDefinition: snapshot.problemDefinitionVersions.some(
+      (v) => v.versionNumber > 1 && v.authorType === "user",
+    ),
   };
 }

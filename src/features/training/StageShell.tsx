@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Stack } from "@/components/ui";
 import { stageIndex, stageLabel, TOTAL_ACTIVE_STAGES } from "@/domain/training/stages";
+import { toUserMessage } from "@/lib/fetch-json";
 import { PastStagesSummary } from "./PastStagesSummary";
 import { useTrainingSession } from "./TrainingSessionProvider";
 
@@ -57,11 +58,10 @@ export function StageShell({
         setError(result.message);
       }
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "저장하지 못했습니다. 작성한 내용은 그대로 있어요.",
-      );
+      // err.message를 그대로 쓰면 브라우저가 던진 영어 원문("Failed to fetch")이
+      // 한국어 화면에 노출된다 — 실제로 네트워크를 끊고 재현했다. 사용자에게는
+      // 무엇이 실패했고 입력이 남아있다는 사실만 한국어로 전한다.
+      setError(toUserMessage(err));
     } finally {
       setPending(false);
     }
@@ -108,7 +108,11 @@ export function StageShell({
       )}
 
       <main className="mx-auto flex w-full max-w-[640px] flex-1 flex-col gap-6 px-5 py-6">
-        <p className="text-body text-text-secondary">{description}</p>
+        {/*
+          이 단계가 무엇을 묻는지가 화면의 주제다 — 스크린리더가 문서 제목으로
+          읽도록 h1으로 두되, 시각적 스타일은 기존 안내 문장 그대로 유지한다.
+        */}
+        <h1 className="text-body text-text-secondary">{description}</h1>
         {children}
         <PastStagesSummary currentStage={currentStage} />
       </main>

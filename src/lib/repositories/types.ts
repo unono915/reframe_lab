@@ -1,4 +1,8 @@
-import type { TrainingSessionSnapshot, TrainingTemplate } from "@/domain/types";
+import type {
+  SessionSummary,
+  TrainingSessionSnapshot,
+  TrainingTemplate,
+} from "@/domain/types";
 
 /**
  * Repository 인터페이스. Phase 2는 `memory/`(인메모리) 구현만 존재하고,
@@ -30,11 +34,11 @@ export interface SessionRepository {
   /** 개별 기록 삭제(History). 자식 산출물은 DB의 ON DELETE CASCADE로 함께 지워진다. */
   deleteSession(sessionId: string): Promise<void>;
   /**
-   * History·Growth용 — 활성 세션도 포함한 사용자의 전체 세션(최신순). Growth는
-   * 이 목록에서 completed만 걸러 재계산하므로(`domain/growth/metrics.ts`) 별도
-   * Growth 전용 조회를 두지 않는다.
+   * History·Growth·Home용 조회 전용 요약 목록(최신순, 활성 세션 포함). 전체 스냅샷을
+   * 반환하지 않는 이유는 `SessionSummary` 주석 참고 — 구현체는 세션 수와 무관하게
+   * 고정된 개수의 쿼리만 써야 한다(세션마다 조회하면 N+1이 된다).
    */
-  listSessionsForUser(userId: string, limit?: number): Promise<TrainingSessionSnapshot[]>;
+  listSessionSummariesForUser(userId: string, limit?: number): Promise<SessionSummary[]>;
 }
 
 export interface TemplateRepository {

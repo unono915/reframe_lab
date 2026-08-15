@@ -148,7 +148,7 @@ describe("createMemorySessionRepository", () => {
     expect(recent).toContain("template-a");
   });
 
-  it("listSessionsForUser returns this user's sessions most-recent-first, regardless of status", async () => {
+  it("listSessionSummariesForUser returns this user's sessions most-recent-first, regardless of status", async () => {
     const userId = uniqueUserId();
     const first = await repo.createSession({
       userId,
@@ -170,10 +170,65 @@ describe("createMemorySessionRepository", () => {
       clientGeneratedId: "c2",
     });
 
-    const listed = await repo.listSessionsForUser(userId, 10);
+    const listed = await repo.listSessionSummariesForUser(userId, 10);
     expect(listed).toHaveLength(2);
-    expect(listed[0]?.session.id).toBe(second.session.id);
-    expect(listed.map((s) => s.session.id)).toContain(first.session.id);
+    expect(listed[0]?.id).toBe(second.session.id);
+    expect(listed.map((s) => s.id)).toContain(first.session.id);
+  });
+
+  it("listSessionSummariesForUser derives Growth 집계 필드를 스냅샷에서 정확히 뽑는다", async () => {
+    const userId = uniqueUserId();
+    const created = await repo.createSession({
+      userId,
+      templateId: "template-a",
+      trainingDate: "2026-08-15",
+      timezone: "Asia/Seoul",
+      clientGeneratedId: "c1",
+    });
+    const sessionId = created.session.id;
+    await repo.saveSnapshot({
+      ...created,
+      session: { ...created.session, status: "completed" },
+      observation: {
+        id: "obs-1",
+        sessionId,
+        rawText: "관찰 문장",
+        version: 1,
+        createdAt: "2026-08-15T00:00:00.000Z",
+        updatedAt: "2026-08-15T00:00:00.000Z",
+      },
+      reframes: [
+        { id: "r1", sessionId, text: "사용자 프레임 1", authorType: "user", order: 0 },
+        { id: "r2", sessionId, text: "사용자 프레임 2", authorType: "user", order: 1 },
+        { id: "r3", sessionId, text: "AI 프레임", authorType: "ai", order: 2 },
+      ],
+      problemDefinitionVersions: [
+        {
+          id: "v1",
+          sessionId,
+          versionNumber: 1,
+          text: "첫 정의",
+          authorType: "user",
+          createdAt: "2026-08-15T00:00:00.000Z",
+        },
+        {
+          id: "v2",
+          sessionId,
+          versionNumber: 2,
+          text: "고쳐 쓴 정의",
+          authorType: "user",
+          createdAt: "2026-08-15T01:00:00.000Z",
+        },
+      ],
+    });
+
+    const [summary] = await repo.listSessionSummariesForUser(userId, 10);
+    expect(summary?.observationText).toBe("관찰 문장");
+    // 최신 버전(v2)을 골라야 한다 — 배열 순서가 아니라 versionNumber 기준.
+    expect(summary?.latestDefinitionText).toBe("고쳐 쓴 정의");
+    // AI가 쓴 프레임은 세지 않는다.
+    expect(summary?.userReframeCount).toBe(2);
+    expect(summary?.hasUserRevisedDefinition).toBe(true);
   });
 });
 

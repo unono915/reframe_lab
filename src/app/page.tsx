@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Card, LinkButton, Stack } from "@/components/ui";
-import type { TrainingSession, TrainingTemplate } from "@/domain/types";
+import type { TrainingSession, TrainingSessionSnapshot, TrainingTemplate } from "@/domain/types";
 import { signOut } from "@/lib/auth/client";
 
 function detectTimezone(): string {
@@ -23,6 +23,7 @@ export default function HomePage() {
   const router = useRouter();
   const [template, setTemplate] = useState<TrainingTemplate | null>(null);
   const [activeSession, setActiveSession] = useState<TrainingSession | null>(null);
+  const [recentRecord, setRecentRecord] = useState<TrainingSessionSnapshot | null>(null);
 
   async function handleSignOut() {
     await signOut();
@@ -60,7 +61,15 @@ export default function HomePage() {
       if (!cancelled) setTemplate(todayBody.template);
     }
 
+    async function loadRecentRecord() {
+      const res = await fetch("/api/history");
+      const body = (await res.json()) as { sessions: TrainingSessionSnapshot[] };
+      const completed = body.sessions.find((s) => s.session.status === "completed");
+      if (!cancelled) setRecentRecord(completed ?? null);
+    }
+
     void load();
+    void loadRecentRecord();
     return () => {
       cancelled = true;
     };
@@ -72,11 +81,19 @@ export default function HomePage() {
   return (
     <main className="pt-safe pb-safe mx-auto flex min-h-dvh max-w-[640px] flex-col justify-center px-5 py-10">
       <Stack gap={8}>
-        <div className="flex justify-end">
+        <Stack direction="row" justify="between" align="center" gap={2}>
+          <Stack direction="row" gap={4}>
+            <Button type="button" variant="tertiary" onClick={() => router.push("/history")}>
+              기록
+            </Button>
+            <Button type="button" variant="tertiary" onClick={() => router.push("/growth")}>
+              성장
+            </Button>
+          </Stack>
           <Button type="button" variant="tertiary" onClick={handleSignOut}>
             로그아웃
           </Button>
-        </div>
+        </Stack>
         <Card variant="daily">
           <Stack gap={3}>
             <p className="text-label font-bold text-brand-strong">오늘 다시 볼 장면</p>
@@ -88,6 +105,22 @@ export default function HomePage() {
         <LinkButton href={trainingHref} variant="primary" fullWidth>
           {isResuming ? "이어서 하기" : "오늘의 훈련 시작"}
         </LinkButton>
+
+        {recentRecord && (
+          <Card
+            variant="interactive"
+            onClick={() => router.push(`/result/${recentRecord.session.id}`)}
+          >
+            <Stack gap={2}>
+              <p className="text-label font-bold text-text-secondary">최근 다시 본 기록</p>
+              <p className="line-clamp-2 text-body text-ink">
+                {[...recentRecord.problemDefinitionVersions].sort(
+                  (a, b) => b.versionNumber - a.versionNumber,
+                )[0]?.text ?? recentRecord.observation?.rawText}
+              </p>
+            </Stack>
+          </Card>
+        )}
       </Stack>
     </main>
   );

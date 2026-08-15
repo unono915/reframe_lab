@@ -1,4 +1,4 @@
-import { STAGES, type Stage } from "@/domain/types";
+import { STAGES, type SessionStatus, type Stage } from "@/domain/types";
 
 /**
  * 활성 단계만의 순서(not_started 제외). 상태 전환·stale 전파 계산의 기준 인덱스다.
@@ -45,3 +45,21 @@ export function stageLabel(stage: Stage): string {
 }
 
 export const TOTAL_ACTIVE_STAGES = STAGE_ORDER.length;
+
+/**
+ * History·Result 등 세션 목록에 노출하는 상태 Label. `stageLabel`과 마찬가지로
+ * 이 맵을 통해서만 참조한다 — 완료 조건 "연속 기록이 끊겨도 비난·실패 표현 없음"에
+ * 맞춰 "포기"·"실패" 같은 단정적 표현 대신 담담한 표현을 쓴다.
+ */
+export function sessionStatusLabel(status: SessionStatus): string {
+  switch (status) {
+    case "completed":
+      return "완료";
+    case "paused":
+      return "보류 중";
+    case "abandoned":
+      return "중단됨";
+    default:
+      return `진행 중 · ${stageLabel(status)}`;
+  }
+}

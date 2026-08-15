@@ -230,5 +230,21 @@ export function createSupabaseSessionRepository(
       const { error } = await client.from("training_sessions").delete().eq("id", sessionId);
       if (error) throw error;
     },
+
+    async listSessionsForUser(
+      userId: string,
+      limit = 100,
+    ): Promise<TrainingSessionSnapshot[]> {
+      const { data, error } = await client
+        .from("training_sessions")
+        .select("id")
+        .eq("user_id", userId)
+        .order("started_at", { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+
+      const snapshots = await Promise.all((data ?? []).map((row) => getSnapshot(row.id)));
+      return snapshots.filter((s): s is TrainingSessionSnapshot => s !== null);
+    },
   };
 }

@@ -147,6 +147,34 @@ describe("createMemorySessionRepository", () => {
     expect(recent[0]).toBe("template-b");
     expect(recent).toContain("template-a");
   });
+
+  it("listSessionsForUser returns this user's sessions most-recent-first, regardless of status", async () => {
+    const userId = uniqueUserId();
+    const first = await repo.createSession({
+      userId,
+      templateId: "template-a",
+      trainingDate: "2026-08-14",
+      timezone: "Asia/Seoul",
+      clientGeneratedId: "c1",
+    });
+    await repo.saveSnapshot({
+      ...first,
+      session: { ...first.session, status: "completed" },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 2));
+    const second = await repo.createSession({
+      userId,
+      templateId: "template-b",
+      trainingDate: "2026-08-15",
+      timezone: "Asia/Seoul",
+      clientGeneratedId: "c2",
+    });
+
+    const listed = await repo.listSessionsForUser(userId, 10);
+    expect(listed).toHaveLength(2);
+    expect(listed[0]?.session.id).toBe(second.session.id);
+    expect(listed.map((s) => s.session.id)).toContain(first.session.id);
+  });
 });
 
 describe("createMemorySessionRepository — isolation across users", () => {

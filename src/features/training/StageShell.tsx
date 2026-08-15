@@ -32,7 +32,8 @@ export function StageShell({
   onPrimaryAction,
 }: StageShellProps) {
   const router = useRouter();
-  const { snapshot, canAdvance, advance, pause } = useTrainingSession();
+  const { snapshot, canAdvance, advance, pause, conflictingDrafts, dismissConflictingDraft } =
+    useTrainingSession();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -76,6 +77,34 @@ export function StageShell({
         </p>
         <span aria-hidden="true" className="w-16" />
       </header>
+
+      {conflictingDrafts.length > 0 && (
+        <div className="mx-auto w-full max-w-[640px] px-5 pt-4">
+          <Stack gap={2}>
+            {conflictingDrafts.map((draft) => (
+              <div
+                key={`${draft.stage}:${draft.promptKey}`}
+                role="status"
+                className="rounded-control bg-warm-gray px-4 py-3"
+              >
+                <p className="text-label font-bold text-ink">
+                  다른 기기에서 이미 지나간 &apos;{stageLabel(draft.stage)}&apos; 단계에
+                  이 기기에만 저장된 내용이 있어요.
+                </p>
+                <p className="mt-1 text-caption text-text-secondary">{draft.content}</p>
+                <Button
+                  type="button"
+                  variant="tertiary"
+                  className="mt-2"
+                  onClick={() => dismissConflictingDraft(draft)}
+                >
+                  확인했어요, 지우기
+                </Button>
+              </div>
+            ))}
+          </Stack>
+        </div>
+      )}
 
       <main className="mx-auto flex w-full max-w-[640px] flex-1 flex-col gap-6 px-5 py-6">
         <p className="text-body text-text-secondary">{description}</p>

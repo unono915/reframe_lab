@@ -1,10 +1,20 @@
 import { expect, test } from "@playwright/test";
+import { resetActiveSession } from "./helpers/cleanup";
 
 /**
  * DEVELOPMENT_PLAN.md §10 Phase 2 완료 조건: "새로고침 후 마지막 완료 단계와 작성 중
- * 초안이 복구됨". 세션 자체(IndexedDB 백엔드 Repository)와 초안(IndexedDB drafts)
- * 두 가지가 모두 새로고침에서 살아남아야 한다.
+ * 초안이 복구됨" — Phase 3부터는 세션 자체가 Supabase에, 초안은 여전히 IndexedDB에
+ * 있다. 둘 다 새로고침에서 살아남아야 한다. 로그인 필수라 전용 E2E 계정이 없으면
+ * 이 파일 전체를 건너뛴다.
  */
+test.skip(
+  !process.env.E2E_TEST_EMAIL || !process.env.E2E_TEST_PASSWORD,
+  "E2E_TEST_EMAIL/PASSWORD 미설정 — 로그인 필요한 E2E는 건너뜀 (.env.example 참고)",
+);
+
+test.beforeEach(async ({ request }) => {
+  await resetActiveSession(request);
+});
 test("새로고침해도 작성 중이던 초안이 복구된다", async ({ page }) => {
   await page.goto("/training/new");
   await expect(page.getByText("1 / 7 관찰")).toBeVisible();

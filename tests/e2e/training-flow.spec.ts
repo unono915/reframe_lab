@@ -1,13 +1,26 @@
 import { expect, type Page, test } from "@playwright/test";
+import { resetActiveSession } from "./helpers/cleanup";
 
 /**
  * DEVELOPMENT_PLAN.md §10 Phase 2 완료 조건: "7단계를 처음부터 끝까지 진행해 완료
  * 상태에 도달 가능". Home → 7단계 → Result까지 실제 폼 입력으로 완주한다.
  *
+ * Phase 3부터 로그인이 필수라 전용 E2E 계정(E2E_TEST_EMAIL/PASSWORD, global-setup.ts)이
+ * 필요하다 — 없으면 이 파일 전체를 건너뛴다.
+ *
  * 각 단계 진입 직후 짧게 안정화 대기를 둔다 — 실제 사용자는 화면을 보고 나서 입력을
  * 시작하지만 Playwright는 즉시 입력하므로, mount 직후 진행되는 초안 복구 useEffect와
  * 첫 keystroke가 겹치면 드물게 입력이 누락되는 경우가 있었다(로컬에서 재현).
  */
+test.skip(
+  !process.env.E2E_TEST_EMAIL || !process.env.E2E_TEST_PASSWORD,
+  "E2E_TEST_EMAIL/PASSWORD 미설정 — 로그인 필요한 E2E는 건너뜀 (.env.example 참고)",
+);
+
+test.beforeEach(async ({ request }) => {
+  await resetActiveSession(request);
+});
+
 async function settle(page: Page) {
   await page.waitForTimeout(200);
 }

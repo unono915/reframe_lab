@@ -21,6 +21,7 @@ export function SeparationStage() {
     addObservationItem,
     confirmObservationItem,
     submitExceptionReason,
+    awaitLatestSnapshot,
     advance,
   } = useTrainingSession();
   const [text, setText] = useState("");
@@ -42,7 +43,12 @@ export function SeparationStage() {
   }
 
   async function handlePrimaryAction() {
-    if (confirmedCount === 0) {
+    // 방금 클릭한 "확인" 토글이 아직 큐에서 처리 중일 수 있으므로, 판단 직전에
+    // 큐가 비워질 때까지 기다려 최신 확인 개수를 다시 센다(원칙 7과 같은 종류의 버그).
+    const latest = await awaitLatestSnapshot();
+    const latestConfirmedCount =
+      latest?.observationItems.filter((i) => i.userConfirmed).length ?? confirmedCount;
+    if (latestConfirmedCount === 0) {
       if (!exceptionReason.trim()) {
         return {
           ok: false as const,

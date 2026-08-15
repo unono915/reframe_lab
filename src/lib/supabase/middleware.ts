@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { requireSupabaseEnv } from "./env";
 
 /**
  * 로그인 없이 접근 가능한 경로. `/auth/*`는 통째로 공개다 — 그중 로그인·가입만
@@ -23,9 +24,13 @@ function isPublicPath(pathname: string): boolean {
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
 
+  // non-null 단언(`!`)은 런타임에 아무 것도 막지 못한다 — 실제로 값이 없는 배포에서
+  // undefined가 그대로 SDK까지 흘러가 매 요청이 500으로 죽었다(env.ts 주석 참고).
+  const { url, anonKey } = requireSupabaseEnv();
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    url,
+    anonKey,
     {
       cookies: {
         getAll() {

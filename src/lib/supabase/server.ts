@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { Database } from "./database.types";
+import { requireSupabaseEnv } from "./env";
 
 /**
  * 서버(Route Handler·Server Component)용 Supabase 클라이언트. 요청의 쿠키에서
@@ -11,10 +12,11 @@ import type { Database } from "./database.types";
  */
 export async function createSupabaseServerClient() {
   const cookieStore = await cookies();
+  const { url, anonKey } = requireSupabaseEnv();
 
   return createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    url,
+    anonKey,
     {
       cookies: {
         getAll() {

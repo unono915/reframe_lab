@@ -29,6 +29,12 @@ export interface SessionRepository {
   listRecentTemplateIds(userId: string, limit: number): Promise<string[]>;
   /** 개별 기록 삭제(History). 자식 산출물은 DB의 ON DELETE CASCADE로 함께 지워진다. */
   deleteSession(sessionId: string): Promise<void>;
+  /**
+   * History·Growth용 — 활성 세션도 포함한 사용자의 전체 세션(최신순). Growth는
+   * 이 목록에서 completed만 걸러 재계산하므로(`domain/growth/metrics.ts`) 별도
+   * Growth 전용 조회를 두지 않는다.
+   */
+  listSessionsForUser(userId: string, limit?: number): Promise<TrainingSessionSnapshot[]>;
 }
 
 export interface TemplateRepository {

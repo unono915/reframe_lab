@@ -45,7 +45,9 @@ test("새로고침해도 이미 완료한 단계로 되돌아가지 않는다", 
 
   expect(page.url()).toBe(url);
   await expect(page.getByText("2 / 7 구분")).toBeVisible();
-  await expect(page.getByText("반복되는 지각 문제")).toBeVisible();
+  // "지난 단계 다시 보기"(PastStagesSummary)가 같은 관찰 문장을 하단에 한 번 더
+  // 보여주므로 두 곳에 나타난다 — 존재 여부만 확인한다.
+  await expect(page.getByText("반복되는 지각 문제").first()).toBeVisible();
 });
 
 test("나가기(보류) 후 다시 들어오면 같은 단계로 이어서 한다", async ({ page }) => {
@@ -65,5 +67,7 @@ test("나가기(보류) 후 다시 들어오면 같은 단계로 이어서 한�
 
   await page.getByRole("link", { name: "이어서 하기" }).click();
   await expect(page.getByText("2 / 7 구분")).toBeVisible();
-  await expect(page.getByText("보류 후 재개 테스트")).toBeVisible();
+  // "지난 단계 다시 보기"(PastStagesSummary)가 같은 관찰 문장을 하단에 한 번 더
+  // 보여주므로 두 곳에 나타난다 — 존재 여부만 확인한다.
+  await expect(page.getByText("보류 후 재개 테스트").first()).toBeVisible();
 });

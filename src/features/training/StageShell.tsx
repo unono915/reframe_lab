@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Stack } from "@/components/ui";
 import { stageIndex, stageLabel, TOTAL_ACTIVE_STAGES } from "@/domain/training/stages";
+import { PastStagesSummary } from "./PastStagesSummary";
 import { useTrainingSession } from "./TrainingSessionProvider";
 
 export interface StageShellProps {
@@ -109,6 +110,7 @@ export function StageShell({
       <main className="mx-auto flex w-full max-w-[640px] flex-1 flex-col gap-6 px-5 py-6">
         <p className="text-body text-text-secondary">{description}</p>
         {children}
+        <PastStagesSummary currentStage={currentStage} />
       </main>
 
       <footer className="border-t border-divider px-5 py-4">

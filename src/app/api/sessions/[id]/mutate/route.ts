@@ -41,34 +41,38 @@ function applyMutation(
     }
     case "addObservationItem": {
       if (!current.observation) return current;
+      const withStale = propagateStalenessIfEditingPastStage(current, "separation");
       const item = buildObservationItem(
         current.observation.id,
         mutation.args,
-        current.observationItems.length,
+        withStale.observationItems.length,
       );
-      return { ...current, observationItems: [...current.observationItems, item] };
+      return { ...withStale, observationItems: [...withStale.observationItems, item] };
     }
     case "confirmObservationItem": {
       const { itemId, confirmed } = mutation.args;
+      const withStale = propagateStalenessIfEditingPastStage(current, "separation");
       return {
-        ...current,
-        observationItems: current.observationItems.map((item) =>
+        ...withStale,
+        observationItems: withStale.observationItems.map((item) =>
           item.id === itemId ? { ...item, userConfirmed: confirmed } : item,
         ),
       };
     }
     case "addQuestion": {
+      const withStale = propagateStalenessIfEditingPastStage(current, "questioning");
       const question = {
-        ...buildQuestion(current.session.id, mutation.args.input, current.questions.length),
+        ...buildQuestion(current.session.id, mutation.args.input, withStale.questions.length),
         hintLevelUsed: mutation.args.hintLevelUsed,
       };
-      return { ...current, questions: [...current.questions, question] };
+      return { ...withStale, questions: [...withStale.questions, question] };
     }
     case "markPriorityQuestion": {
       const { questionId, priorityReason } = mutation.args;
+      const withStale = propagateStalenessIfEditingPastStage(current, "questioning");
       return {
-        ...current,
-        questions: current.questions.map((q) =>
+        ...withStale,
+        questions: withStale.questions.map((q) =>
           q.id === questionId
             ? { ...q, isPriority: true, priorityReason }
             : { ...q, isPriority: false, priorityReason: undefined },
@@ -76,23 +80,26 @@ function applyMutation(
       };
     }
     case "addExplorationResponse": {
+      const withStale = propagateStalenessIfEditingPastStage(current, "exploration");
       const response = buildStageResponse(current.session.id, "exploration", mutation.args);
-      const withoutOld = current.stageResponses.filter(
+      const withoutOld = withStale.stageResponses.filter(
         (r) => !(r.stage === "exploration" && r.promptKey === mutation.args.promptKey),
       );
-      return { ...current, stageResponses: [...withoutOld, response] };
+      return { ...withStale, stageResponses: [...withoutOld, response] };
     }
     case "addPerspective": {
+      const withStale = propagateStalenessIfEditingPastStage(current, "reframing");
       const perspective = buildPerspective(
         current.session.id,
         mutation.args,
-        current.perspectives.length,
+        withStale.perspectives.length,
       );
-      return { ...current, perspectives: [...current.perspectives, perspective] };
+      return { ...withStale, perspectives: [...withStale.perspectives, perspective] };
     }
     case "addReframe": {
-      const reframe = buildReframe(current.session.id, mutation.args.input, current.reframes.length);
-      return { ...current, reframes: [...current.reframes, reframe] };
+      const withStale = propagateStalenessIfEditingPastStage(current, "reframing");
+      const reframe = buildReframe(current.session.id, mutation.args.input, withStale.reframes.length);
+      return { ...withStale, reframes: [...withStale.reframes, reframe] };
     }
     case "submitDefinition": {
       const version = buildProblemDefinitionVersion(

@@ -1,3 +1,5 @@
+export { Badge } from "./Badge";
+export type { BadgeProps, BadgeVariant } from "./Badge";
 export { Button, LinkButton } from "./Button";
 export type { ButtonProps, ButtonVariant, LinkButtonProps } from "./Button";
 export { Card } from "./Card";

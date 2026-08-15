@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Card, Stack } from "@/components/ui";
+import { Badge, Button, Card, Stack } from "@/components/ui";
 import { SELF_CHECK_ITEMS, type SelfCheckKey } from "@/domain/training/requirements";
 import { StageShell } from "../StageShell";
 import { useTrainingSession } from "../TrainingSessionProvider";
@@ -22,6 +22,12 @@ export function FeedbackStage() {
   const latestFeedback = snapshot.aiFeedbacks
     .filter((f) => !f.isStale && f.problemDefinitionVersionId === latestVersion?.id)
     .at(-1);
+
+  // DESIGN.md §11 UI States "Stale Feedback": 앞선 단계를 고쳐서 이전 피드백이
+  // 무효화된 경우, 조용히 "피드백 없음"으로 보이면 사용자가 왜 사라졌는지 알 수 없다.
+  const staleFeedbackExists = snapshot.aiFeedbacks.some(
+    (f) => f.isStale && f.problemDefinitionVersionId === latestVersion?.id,
+  );
 
   const allChecked = checked.size === SELF_CHECK_ITEMS.length;
 
@@ -74,14 +80,21 @@ export function FeedbackStage() {
             <p className="text-body-lg text-ink">{latestFeedback.nextQuestion}</p>
           </Stack>
         ) : (
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={handleGetFeedback}
-            disabled={feedbackRequested}
-          >
-            AI 피드백 보기
-          </Button>
+          <Stack gap={2}>
+            {staleFeedbackExists && (
+              <Badge variant="stale">
+                앞선 내용을 수정해 이 피드백을 다시 확인해야 해요.
+              </Badge>
+            )}
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleGetFeedback}
+              disabled={feedbackRequested}
+            >
+              {staleFeedbackExists ? "AI 피드백 다시 보기" : "AI 피드백 보기"}
+            </Button>
+          </Stack>
         )}
 
         <Stack gap={3}>

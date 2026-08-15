@@ -1,4 +1,5 @@
 import { createBrowserClient } from "@supabase/ssr";
+import type { Database } from "./database.types";
 
 /**
  * 브라우저(Client Component)용 Supabase 클라이언트. anon key만 사용 — RLS가
@@ -7,7 +8,7 @@ import { createBrowserClient } from "@supabase/ssr";
  * (eslint.config.mjs 레이어 규칙).
  */
 export function createSupabaseBrowserClient() {
-  return createBrowserClient(
+  return createBrowserClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
   );

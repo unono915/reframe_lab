@@ -25,8 +25,23 @@ export const REQUIRED_SUPABASE_ENV = [
 
 type Env = Record<string, string | undefined>;
 
+/**
+ * `NEXT_PUBLIC_*`는 Next.js가 `process.env.NEXT_PUBLIC_X` **리터럴 표현**을 찾아
+ * 빌드 시점에 실제 값으로 치환한다 — `process.env[동적키]`처럼 배열을 순회하며
+ * 동적으로 읽으면 번들러가 정적 치환을 하지 못해 브라우저에서는 항상 undefined가
+ * 된다(2026-08-26 실제 로그인 시도에서 발견 — 이 검사 때문에 브라우저 로그인이
+ * 매번 막혀 있었다). 그래서 두 값을 여기서 리터럴로 직접 읽어 고정 객체를 만들고,
+ * 그 결과 객체만 동적으로 순회한다.
+ */
+function readSupabaseEnv(): Env {
+  return {
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  };
+}
+
 /** 비어 있거나 공백뿐인 값도 누락으로 본다 — 대시보드에서 실수로 빈 값을 넣는 경우. */
-export function missingSupabaseEnv(env: Env = process.env): string[] {
+export function missingSupabaseEnv(env: Env = readSupabaseEnv()): string[] {
   return REQUIRED_SUPABASE_ENV.filter((name) => !env[name]?.trim());
 }
 
@@ -49,12 +64,13 @@ export function supabaseEnvErrorMessage(missing: string[]): string {
  * 실제로 그 단언 때문에 undefined가 Supabase SDK까지 흘러들어가 죽었다.
  */
 export function requireSupabaseEnv(): { url: string; anonKey: string } {
-  const missing = missingSupabaseEnv();
+  const env = readSupabaseEnv();
+  const missing = missingSupabaseEnv(env);
   if (missing.length > 0) {
     throw new Error(supabaseEnvErrorMessage(missing));
   }
   return {
-    url: process.env.NEXT_PUBLIC_SUPABASE_URL as string,
-    anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string,
+    url: env.NEXT_PUBLIC_SUPABASE_URL as string,
+    anonKey: env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string,
   };
 }

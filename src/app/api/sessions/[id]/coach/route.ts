@@ -5,6 +5,7 @@ import { hasMinimalUserInput } from "@/domain/training/requirements";
 import { buildCoachContext } from "@/lib/ai/context";
 import { getFallbackQuestion } from "@/lib/ai/fallback";
 import { runCoachGuardrails } from "@/lib/ai/guardrails";
+import type { CoachOutput } from "@/lib/ai/provider";
 import { getActiveCoachProvider } from "@/lib/ai/providers";
 import { coachOutputSchema, type CoachOutputSchema } from "@/lib/schemas/coach-output";
 import { checkRateLimit, SESSION_AI_CALL_CAP } from "@/lib/rate-limit";
@@ -31,7 +32,12 @@ async function getValidatedCoachOutput(
   const context = { stage, hintLevel, userText, recentQuestions };
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    const raw = await provider.getCoachResponse(context);
+    let raw: CoachOutput | undefined;
+    try {
+      raw = await provider.getCoachResponse(context);
+    } catch {
+      continue;
+    }
     const parsed = coachOutputSchema.safeParse(raw);
     if (!parsed.success) continue;
 

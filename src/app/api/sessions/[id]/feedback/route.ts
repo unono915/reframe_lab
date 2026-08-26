@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { AIFeedback } from "@/domain/types";
 import { hasMinimalUserInput } from "@/domain/training/requirements";
 import { runFeedbackGuardrails } from "@/lib/ai/guardrails";
+import type { FeedbackOutput } from "@/lib/ai/provider";
 import { getActiveCoachProvider } from "@/lib/ai/providers";
 import { feedbackOutputSchema } from "@/lib/schemas/feedback-output";
 import { checkRateLimit, SESSION_AI_CALL_CAP } from "@/lib/rate-limit";
@@ -67,7 +68,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     let validated = null as ReturnType<typeof feedbackOutputSchema.safeParse> | null;
 
     for (let attempt = 0; attempt < 2; attempt += 1) {
-      const raw = await provider.getFeedback({ definitionText: latest.text, supportingText });
+      let raw: FeedbackOutput | undefined;
+      try {
+        raw = await provider.getFeedback({ definitionText: latest.text, supportingText });
+      } catch {
+        continue;
+      }
       const parsedOutput = feedbackOutputSchema.safeParse(raw);
       if (!parsedOutput.success) continue;
       if (runFeedbackGuardrails(parsedOutput.data, supportingText).ok) {

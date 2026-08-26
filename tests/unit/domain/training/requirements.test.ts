@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   checkStageRequirement,
   EXCEPTION_PROMPT_KEYS,
+  hasMinimalUserInput,
   SELF_CHECK_ITEMS,
 } from "@/domain/training/requirements";
 import {
   makeAIFeedback,
   makeObservation,
   makeObservationItem,
+  makePerspective,
   makeProblemDefinitionVersion,
   makeQuestion,
   makeReframe,
@@ -324,6 +326,81 @@ describe("checkStageRequirement — feedback", () => {
       met: true,
       viaException: true,
     });
+  });
+});
+
+describe("hasMinimalUserInput — User-first gate", () => {
+  it("not_started is always false", () => {
+    expect(hasMinimalUserInput("not_started", makeSnapshot())).toBe(false);
+  });
+
+  it("observation requires non-blank rawText", () => {
+    expect(hasMinimalUserInput("observation", makeSnapshot())).toBe(false);
+    expect(
+      hasMinimalUserInput(
+        "observation",
+        makeSnapshot({ observation: makeObservation({ rawText: "   " }) }),
+      ),
+    ).toBe(false);
+    expect(
+      hasMinimalUserInput("observation", makeSnapshot({ observation: makeObservation() })),
+    ).toBe(true);
+  });
+
+  it("separation requires at least one item, confirmed or not", () => {
+    expect(hasMinimalUserInput("separation", makeSnapshot())).toBe(false);
+    expect(
+      hasMinimalUserInput(
+        "separation",
+        makeSnapshot({ observationItems: [makeObservationItem({ userConfirmed: false })] }),
+      ),
+    ).toBe(true);
+  });
+
+  it("questioning requires at least one user-authored question (AI-authored doesn't count)", () => {
+    expect(hasMinimalUserInput("questioning", makeSnapshot())).toBe(false);
+    expect(
+      hasMinimalUserInput(
+        "questioning",
+        makeSnapshot({ questions: [makeQuestion({ authorType: "ai" })] }),
+      ),
+    ).toBe(false);
+    expect(
+      hasMinimalUserInput("questioning", makeSnapshot({ questions: [makeQuestion()] })),
+    ).toBe(true);
+  });
+
+  it("exploration requires at least one non-draft response for that stage", () => {
+    expect(hasMinimalUserInput("exploration", makeSnapshot())).toBe(false);
+    expect(
+      hasMinimalUserInput(
+        "exploration",
+        makeSnapshot({ stageResponses: [makeStageResponse({ isDraft: true })] }),
+      ),
+    ).toBe(false);
+    expect(
+      hasMinimalUserInput("exploration", makeSnapshot({ stageResponses: [makeStageResponse()] })),
+    ).toBe(true);
+  });
+
+  it("reframing requires at least one user perspective or reframe", () => {
+    expect(hasMinimalUserInput("reframing", makeSnapshot())).toBe(false);
+    expect(
+      hasMinimalUserInput("reframing", makeSnapshot({ perspectives: [makePerspective()] })),
+    ).toBe(true);
+    expect(hasMinimalUserInput("reframing", makeSnapshot({ reframes: [makeReframe()] }))).toBe(
+      true,
+    );
+  });
+
+  it("definition and feedback both require a user-authored v1", () => {
+    expect(hasMinimalUserInput("definition", makeSnapshot())).toBe(false);
+    expect(hasMinimalUserInput("feedback", makeSnapshot())).toBe(false);
+    const snapshot = makeSnapshot({
+      problemDefinitionVersions: [makeProblemDefinitionVersion({ versionNumber: 1 })],
+    });
+    expect(hasMinimalUserInput("definition", snapshot)).toBe(true);
+    expect(hasMinimalUserInput("feedback", snapshot)).toBe(true);
   });
 });
 

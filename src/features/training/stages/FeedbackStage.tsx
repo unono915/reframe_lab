@@ -10,7 +10,8 @@ import { useTrainingSession } from "../TrainingSessionProvider";
 export function FeedbackStage() {
   const router = useRouter();
   const { snapshot, requestFeedback, completeSelfCheck, advance } = useTrainingSession();
-  const [feedbackRequested, setFeedbackRequested] = useState(false);
+  const [feedbackPending, setFeedbackPending] = useState(false);
+  const [feedbackError, setFeedbackError] = useState<string | null>(null);
   const [checked, setChecked] = useState<Set<SelfCheckKey>>(new Set());
 
   if (!snapshot) return null;
@@ -32,8 +33,13 @@ export function FeedbackStage() {
   const allChecked = checked.size === SELF_CHECK_ITEMS.length;
 
   async function handleGetFeedback() {
-    setFeedbackRequested(true);
-    await requestFeedback();
+    setFeedbackPending(true);
+    setFeedbackError(null);
+    const result = await requestFeedback();
+    setFeedbackPending(false);
+    if (!result.ok) {
+      setFeedbackError(result.message);
+    }
   }
 
   async function handleCompleteSelfCheck() {
@@ -86,13 +92,24 @@ export function FeedbackStage() {
                 앞선 내용을 수정해 이 피드백을 다시 확인해야 해요.
               </Badge>
             )}
+            {feedbackError && (
+              <p role="alert" className="rounded-control bg-danger-bg px-4 py-3 text-label font-bold text-danger">
+                {feedbackError} 아래 자기 점검으로도 완료할 수 있어요.
+              </p>
+            )}
             <Button
               type="button"
               variant="secondary"
               onClick={handleGetFeedback}
-              disabled={feedbackRequested}
+              disabled={feedbackPending}
             >
-              {staleFeedbackExists ? "AI 피드백 다시 보기" : "AI 피드백 보기"}
+              {feedbackPending
+                ? "AI 피드백 요청 중"
+                : feedbackError
+                  ? "다시 시도"
+                  : staleFeedbackExists
+                    ? "AI 피드백 다시 보기"
+                    : "AI 피드백 보기"}
             </Button>
           </Stack>
         )}

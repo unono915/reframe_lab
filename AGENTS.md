@@ -101,17 +101,52 @@
 
 **검수 대기:** `contrastive.ts`의 8개 사례 문구는 `DAILY_TEMPLATES`와 같은 §14-F 검수 대상 초안이다.
 
+### 2026-09-01 (이어서) — L3·L4 실동작 검증 완료
+
+Supabase 프로젝트를 재개하고 **실제 DB·브라우저로 전 경로를 완주**했다. 검증 수준 `L4`.
+
+> ⚠️ **재개 직후 판단 착오 기록.** 프로젝트가 `COMING_UP`인 동안 쿼리가 빈 결과를 돌려줘
+> "테이블 0개·사용자 0명 — 데이터 전부 소실"로 사용자에게 잘못 보고했다. 기동이 끝난 뒤
+> 확인하니 13개 테이블·세션 35개·사용자 1명이 **전부 온전했다.**
+> **교훈: `COMING_UP` 상태의 빈 응답을 데이터 부재로 해석하지 않는다.** 상태가
+> `ACTIVE_HEALTHY`가 될 때까지 기다린 뒤에 판단할 것. (마이그레이션은 적용되지 않았다 —
+> 첫 시도가 "already exists"로 거부돼 아무것도 덮어쓰지 않았다.)
+
+**검증한 것 (전부 실제 DB 행으로 확인):**
+
+| 항목 | 결과 |
+|---|---|
+| Supabase 브라우저 로그인 | ✅ `env.ts` 수정이 실동작으로 확인됨 (지난 세션 미완 항목) |
+| Upstage 연결 | ✅ `coach_interactions`·`ai_feedbacks` 모두 `provider='upstage'`, `model='solar-pro4'`, `status='ok'` |
+| P0-3 단계별 설명 | ✅ 관찰 단계에서 펼쳐 문구 확인 |
+| P0-1 통합 단계 | ✅ `goal_mismatch` 렌즈에 맞는 대조 사례가 v1 저장 후 정확히 노출 |
+| P0-2 자기 점검 승격 | ✅ `stage_responses`에 `self_check_*` 6행 + 완료 표시 저장. 자기평가 전에는 AI 피드백 버튼이 열리지 않음 |
+| P0-2 대조표 | ✅ **6개를 일부러 전부 '드러남'으로 과신 응답 → 코치가 `explore_further` 판정한 2개만 정확히 짚어냄.** 키 매핑 수정이 실제로 작동함을 확인 |
+| P0-4 v2 + 변경 이유 | ✅ 이유를 비우면 검증에 걸리고, 채우면 `change_reason` 컬럼에 저장. Result 화면에 "바꾼 이유"로 표시 |
+
+**이 검증에서 발견·수정한 실버그 1건 (커밋 `d32e792`):**
+> Upstage가 `action:"ask"`인데 `question:null`을 반환했고 Guardrail이 통과시켰다.
+> Route Handler는 `question`만 돌려주므로 **AI 호출은 소진되고(비용 발생) 힌트 버튼은
+> 아무 반응 없이 끝났다.** 단위 테스트로는 잡히지 않는, 실패가 조용한 종류다.
+> `checkAskHasQuestion` 추가 후 같은 버튼이 재시도를 거쳐 실제 질문을 반환하는 것을
+> 라이브로 재확인했다.
+
+> **패턴 주의:** 이 프로젝트에서 "힌트 버튼이 침묵한다"는 증상이 **세 번째**다
+> (① Mock 시절 오류 무반응 ② User-first gate 오류 코드 ③ 이번 null 질문).
+> 힌트·피드백 경로를 건드릴 때는 **모든 종료 경로에서 사용자에게 무엇이든 보이는지**를
+> 반드시 확인할 것.
+
 ---
 
 ## 4. 다음 에이전트가 이어서 할 일
 
-1. **[최우선] Supabase 재개 후 L3·L4 검증.** 두 가지가 함께 밀려 있다.
-   - Upstage 연결 실동작(`provider='upstage'` 행 확인)
-   - **P0 개선안 4건의 실동작** — 특히 재작성된 돌아보기 단계 전체 경로:
-     자기평가 저장 → `stageResponses`에 `self_check_*` 6행 확인 → AI 피드백 요청 →
-     **대조표에 어긋난 차원이 실제로 표시되는지**(위 실버그의 회귀 확인) → v2 작성 →
-     `change_reason` 컬럼에 값이 남는지 SQL로 확인
-2. `RESEARCH_VALIDATION.md` §5의 **P1** 개선안 — 특히 P1-5(Growth 지표를 품질 변화 지표로 교체).
-   원천 데이터(`ai_feedbacks.dimensions`, `hintLevelUsed`, `authorType`)와 자기평가 기록이
-   이제 모두 갖춰졌으므로 계산만 하면 된다.
+1. **`RESEARCH_VALIDATION.md` §5의 P1 개선안** — 특히 **P1-5(Growth 지표를 품질 변화 지표로 교체)**.
+   현재 `domain/growth/metrics.ts`의 6개 지표는 전부 횟수·빈도라 PRD §2.4가 스스로 금지한
+   "단순 개수"에 해당한다. 원천 데이터(`ai_feedbacks.dimensions`, `coach_interactions.hint_level`,
+   `stage_responses`의 `self_check_*`)가 이제 **모두 실제로 쌓이는 것이 확인됐으므로** 계산만 하면 된다.
+   `listSessionSummariesForUser`가 쿼리 4개로 배치 조회하는 구조라 여기에 2~3개를 더하는 형태가 된다.
+2. **P1-6(규칙 기반 fallback을 전이 프로브로 재활용)** — AI 없이도 능력이 향상되는지 검증할
+   유일한 내장 수단이다. `UPSTAGE_API_KEY`를 비우면 Mock으로 떨어지는 경로가 이미 있다.
 3. Phase 6(PWA 안정화) 중 배포·실기 테스트 없이 가능한 부분.
+4. **Supabase는 무료 티어라 다시 휴면된다.** 검증이 필요한 세션은 `get_project`로 상태를 먼저
+   확인하고, `COMING_UP`이면 `ACTIVE_HEALTHY`가 될 때까지 기다린 뒤 판단할 것.

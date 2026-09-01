@@ -12,6 +12,7 @@ import type { FeedbackOutputSchema } from "@/lib/schemas/feedback-output";
 
 export type GuardrailErrorCode =
   | "multiple_questions"
+  | "missing_question"
   | "unverified_evidence"
   | "fabricated_fact"
   | "ghostwriting"
@@ -38,6 +39,25 @@ const QUESTION_MARK_PATTERN = /[?？]/;
 function checkSingleQuestion(output: CoachOutputSchema): boolean {
   if (output.question === null) return true;
   return !QUESTION_MARK_PATTERN.test(output.coachMessage);
+}
+
+/**
+ * 2-b. `action: "ask"`인데 질문이 없으면 위반.
+ *
+ * 실제 Upstage 응답에서 발견했다(2026-09-01 라이브 검증). 모델이 `action: "ask"`,
+ * `question: null`, 그리고 내용 있는 `coachMessage`를 함께 반환했다. 기존 검사는
+ * "질문이 null이면 통과"라서 이 자기모순을 그대로 통과시켰고, Route Handler는
+ * `question`만 응답으로 돌려주므로 **AI 호출은 소진됐는데 화면에는 아무것도 뜨지 않았다.**
+ *
+ * 원칙 2("AI는 한 번에 하나만 묻는다")는 상한이자 하한이다 — 묻겠다고 해놓고 아무것도
+ * 묻지 않으면 힌트 버튼이 침묵한다. 여기서 막으면 재시도 후 규칙 기반 fallback 질문이
+ * 나가므로, 사용자는 어떤 경로로든 질문 하나를 받는다(원칙 8).
+ *
+ * 다른 action(`suggest_advance`·`feedback`·`fallback`·`safety`)은 질문이 없어도 정상이다.
+ */
+function checkAskHasQuestion(output: CoachOutputSchema): boolean {
+  if (output.action !== "ask") return true;
+  return Boolean(output.question?.trim());
 }
 
 /**
@@ -117,6 +137,7 @@ export function runCoachGuardrails(
   const violations: GuardrailErrorCode[] = [];
 
   if (!checkSingleQuestion(output)) violations.push("multiple_questions");
+  if (!checkAskHasQuestion(output)) violations.push("missing_question");
 
   const evidence = checkEvidence(output, context.userText);
   if (evidence.violated) violations.push("unverified_evidence");

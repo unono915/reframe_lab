@@ -32,6 +32,45 @@ describe("runCoachGuardrails — 위반 감지", () => {
     expect(result.violations).toContain("multiple_questions");
   });
 
+  /**
+   * 2026-09-01 실제 Upstage 응답에서 나온 형태다. action은 "ask"인데 question이 null이고
+   * coachMessage에만 내용이 있었다. 기존 검사는 "question이 null이면 통과"라 이걸
+   * 그대로 통과시켰고, Route Handler는 question만 돌려주므로 AI 호출은 소진됐는데
+   * 힌트 버튼이 아무 반응 없이 끝났다 — 실패가 조용한 종류의 버그다.
+   */
+  it("action이 ask인데 질문이 없으면 위반 — 힌트 버튼이 침묵하면 안 된다", () => {
+    const result = runCoachGuardrails(
+      {
+        ...VALID_OUTPUT,
+        action: "ask",
+        question: null,
+        coachMessage: "세 질문 모두 회의의 흐름을 겨냥하고 있습니다.",
+      },
+      baseContext,
+    );
+    expect(result.ok).toBe(false);
+    expect(result.violations).toContain("missing_question");
+  });
+
+  it("공백뿐인 질문도 없는 것으로 본다", () => {
+    const result = runCoachGuardrails(
+      { ...VALID_OUTPUT, action: "ask", question: "   " },
+      baseContext,
+    );
+    expect(result.violations).toContain("missing_question");
+  });
+
+  it("ask가 아닌 action은 질문이 없어도 정상이다", () => {
+    // suggest_advance·feedback·fallback·safety는 물어볼 것이 없는 상태가 정상이다.
+    for (const action of ["suggest_advance", "feedback", "fallback", "safety"] as const) {
+      const result = runCoachGuardrails(
+        { ...VALID_OUTPUT, action, question: null, coachMessage: "다음 단계로 넘어가도 좋아요." },
+        baseContext,
+      );
+      expect(result.violations, action).not.toContain("missing_question");
+    }
+  });
+
   it("evidenceReferences가 사용자 입력에 없으면 근거 없음 위반", () => {
     const result = runCoachGuardrails(UNVERIFIED_EVIDENCE_OUTPUT, baseContext);
     expect(result.ok).toBe(false);

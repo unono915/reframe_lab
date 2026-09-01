@@ -4,8 +4,10 @@ import {
   nextStageOf,
   stageIndex,
   stageLabel,
+  stageRationale,
   STAGE_LABELS,
   STAGE_ORDER,
+  STAGE_RATIONALE,
   TOTAL_ACTIVE_STAGES,
 } from "@/domain/training/stages";
 
@@ -75,5 +77,33 @@ describe("stageLabel", () => {
     expect(stageLabel("separation")).toBe("구분");
     expect(stageLabel("feedback")).toBe("돌아보기");
     expect(stageLabel("not_started")).toBe("시작 전");
+  });
+});
+
+describe("stageRationale", () => {
+  it("every active stage explains why it exists (P0-3 명시적 교육)", () => {
+    for (const stage of STAGE_ORDER) {
+      expect(STAGE_RATIONALE[stage]).toBeTruthy();
+    }
+  });
+
+  it("returns null for not_started — 시작 전에는 설명할 단계가 없다", () => {
+    expect(stageRationale("not_started")).toBeNull();
+  });
+
+  /**
+   * 이 문장들은 "왜"를 설명하는 것이지 "이렇게 쓰세요"가 아니다. 답을 예시로 주면
+   * 원칙 3(AI가 대신 정의하지 않는다)의 취지를 UI가 우회하게 된다 — 문구를 고칠 때
+   * 이 선을 넘지 않도록 잡아두는 테스트다.
+   */
+  it("does not hand the user a model answer", () => {
+    for (const stage of STAGE_ORDER) {
+      expect(STAGE_RATIONALE[stage]).not.toMatch(/예를 들어|이렇게 쓰|예시:/);
+    }
+  });
+
+  it("재정의 단계는 고착 경향을 명시적으로 알려준다", () => {
+    // Einstellung 연구: 편향의 존재를 알려주기만 해도 고착이 유의하게 줄었다.
+    expect(STAGE_RATIONALE.reframing).toContain("고정");
   });
 });

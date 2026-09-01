@@ -4,10 +4,36 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Stack } from "@/components/ui";
-import { stageIndex, stageLabel, TOTAL_ACTIVE_STAGES } from "@/domain/training/stages";
+import type { Stage } from "@/domain/types";
+import {
+  stageIndex,
+  stageLabel,
+  stageRationale,
+  TOTAL_ACTIVE_STAGES,
+} from "@/domain/training/stages";
 import { toUserMessage } from "@/lib/fetch-json";
 import { PastStagesSummary } from "./PastStagesSummary";
 import { useTrainingSession } from "./TrainingSessionProvider";
+
+/**
+ * "왜 이걸 하나요" 한 줄 (RESEARCH_VALIDATION.md §5 P0-3). 기본은 접혀 있어 훈련
+ * 흐름을 방해하지 않고, 필요한 사용자만 펼친다. `<details>`를 쓰는 이유는 키보드·
+ * 스크린리더 동작을 브라우저가 이미 올바르게 처리하기 때문이다 — 직접 만든 토글은
+ * aria-expanded·포커스 순서를 매번 다시 맞춰야 한다.
+ */
+function StageRationale({ stage }: { stage: Stage }) {
+  const rationale = stageRationale(stage);
+  if (!rationale) return null;
+
+  return (
+    <details className="rounded-control bg-warm-gray px-4 py-3">
+      <summary className="cursor-pointer text-label font-bold text-text-secondary">
+        왜 이걸 하나요?
+      </summary>
+      <p className="mt-2 text-caption text-ink">{rationale}</p>
+    </details>
+  );
+}
 
 export interface StageShellProps {
   /** 단계 안내 1~2줄 (DESIGN.md §10.3 Body 1번). */
@@ -113,6 +139,7 @@ export function StageShell({
           읽도록 h1으로 두되, 시각적 스타일은 기존 안내 문장 그대로 유지한다.
         */}
         <h1 className="text-body text-text-secondary">{description}</h1>
+        <StageRationale stage={currentStage} />
         {children}
         <PastStagesSummary currentStage={currentStage} />
       </main>

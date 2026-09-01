@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge, Button, Card, Field, Stack, Textarea } from "@/components/ui";
+import { contrastiveExampleFor } from "@/domain/training/contrastive";
 import { SELF_CHECK_ITEMS, type SelfCheckKey } from "@/domain/training/requirements";
 import {
   compareSelfAssessmentWithAi,
@@ -29,7 +30,7 @@ type AssessmentDraft = Partial<Record<SelfCheckKey, SelfAssessmentStatus>>;
  */
 export function FeedbackStage() {
   const router = useRouter();
-  const { snapshot, requestFeedback, completeSelfCheck, submitDefinition, advance } =
+  const { snapshot, template, requestFeedback, completeSelfCheck, submitDefinition, advance } =
     useTrainingSession();
 
   const [feedbackPending, setFeedbackPending] = useState(false);
@@ -60,6 +61,7 @@ export function FeedbackStage() {
     (f) => f.isStale && f.problemDefinitionVersionId === latestVersion?.id,
   );
 
+  const example = contrastiveExampleFor(template?.lensType);
   const assessmentSaved = hasCompletedSelfAssessment(snapshot);
   const showForm = !assessmentSaved || editing;
   const currentAnswers = showForm ? draft : readSelfAssessment(snapshot);
@@ -131,7 +133,37 @@ export function FeedbackStage() {
           </Card>
         )}
 
-        {/* 1) 사용자가 먼저 판단한다 — AI 피드백보다 앞선다. */}
+        {/*
+          1) 통합(Consolidation) 단계 — v1을 저장한 뒤에만 보인다.
+          사용자 자신의 문장이 아니라 남의 사례라서 원칙 3을 건드리지 않는다.
+        */}
+        {example && (
+          <Card variant="paper">
+            <p className="text-label font-bold text-brand-strong">다른 사례로 견줘보기</p>
+            <p className="mt-1 text-caption text-text-secondary">
+              내 문장을 고치라는 뜻이 아니에요. 같은 종류의 장면을 다른 사람이 어떻게
+              옮겨 적었는지 보는 것뿐이에요.
+            </p>
+            <Stack gap={3}>
+              <div className="mt-3">
+                <p className="text-caption font-bold text-text-secondary">처음 떠오르기 쉬운 문장</p>
+                <p className="text-body text-text-secondary line-through decoration-border">
+                  {example.weak}
+                </p>
+              </div>
+              <div>
+                <p className="text-caption font-bold text-text-secondary">옮겨 적은 문장</p>
+                <p className="text-body text-ink">{example.strong}</p>
+              </div>
+              <div>
+                <p className="text-caption font-bold text-text-secondary">무엇이 달라졌나</p>
+                <p className="text-body text-ink">{example.whatChanged}</p>
+              </div>
+            </Stack>
+          </Card>
+        )}
+
+        {/* 2) 사용자가 먼저 판단한다 — AI 피드백보다 앞선다. */}
         <Stack gap={3}>
           <p className="text-heading-3 font-bold text-ink">먼저 스스로 점검해볼까요?</p>
           <p className="text-caption text-text-secondary">

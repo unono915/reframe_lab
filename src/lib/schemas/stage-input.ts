@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SELF_CHECK_ITEMS, type SelfCheckKey } from "@/domain/training/requirements";
 
 /**
  * 단계별 사용자 입력 Zod 스키마. Client(react-hook-form)·Server(Route Handler, Phase 3)가
@@ -106,6 +107,29 @@ export const stageResponseInputSchema = z.object({
   content: z.string().trim().min(1, "내용을 입력해주세요.").max(2000),
 });
 export type StageResponseInput = z.infer<typeof stageResponseInputSchema>;
+
+// ---- feedback 단계 자기 점검 (RESEARCH_VALIDATION.md §5 P0-2) ----
+// 키 목록은 `domain/training/requirements.ts`의 SELF_CHECK_ITEMS가 정본이다.
+// 여기서 enum을 새로 쓰지 않고 그 배열에서 파생시켜 드리프트를 막는다.
+
+const selfCheckKeys = SELF_CHECK_ITEMS.map((item) => item.key);
+
+export const selfCheckKeySchema = z.enum(
+  selfCheckKeys as [SelfCheckKey, ...SelfCheckKey[]],
+);
+
+export const selfAssessmentInputSchema = z.object({
+  assessments: z
+    .array(
+      z.object({
+        key: selfCheckKeySchema,
+        status: z.enum(["shown", "not_yet"]),
+      }),
+    )
+    // 6개를 모두 받는다 — 일부만 답한 상태로 AI 판정과 대조하면 의미가 없다.
+    .length(selfCheckKeys.length),
+});
+export type SelfAssessmentInput = z.infer<typeof selfAssessmentInputSchema>;
 
 export const explorationResponseInputSchema = stageResponseInputSchema.extend({
   promptKey: explorationPromptKeySchema,

@@ -37,7 +37,10 @@ import {
 } from "@/lib/persistence/drafts";
 import { findConflictingDrafts } from "@/lib/persistence/reconciliation";
 import type { MutateAction } from "@/lib/schemas/mutate-actions";
-import type { explorationPromptKeySchema } from "@/lib/schemas/stage-input";
+import type {
+  explorationPromptKeySchema,
+  SelfAssessmentInput,
+} from "@/lib/schemas/stage-input";
 import type { z } from "zod";
 
 /**
@@ -137,7 +140,7 @@ export interface TrainingSessionContextValue {
     promptKey: (typeof EXCEPTION_PROMPT_KEYS)[keyof typeof EXCEPTION_PROMPT_KEYS],
     content: string,
   ) => Promise<void>;
-  completeSelfCheck: () => Promise<void>;
+  completeSelfCheck: (assessments: SelfAssessmentInput["assessments"]) => Promise<void>;
   requestHint: (
     hintLevel: HintLevel,
   ) => Promise<{ ok: true; question: string } | { ok: false; message: string }>;
@@ -445,9 +448,12 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
     [callMutate],
   );
 
-  const completeSelfCheck = useCallback(async () => {
-    await callMutate({ action: "completeSelfCheck", args: {} });
-  }, [callMutate]);
+  const completeSelfCheck = useCallback(
+    async (assessments: SelfAssessmentInput["assessments"]) => {
+      await callMutate({ action: "completeSelfCheck", args: { assessments } });
+    },
+    [callMutate],
+  );
 
   const requestHint = useCallback(
     (

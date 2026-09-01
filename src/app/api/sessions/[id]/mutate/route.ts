@@ -9,6 +9,8 @@ import {
   buildReframe,
   buildStageResponse,
 } from "@/domain/training/builders";
+import { FEEDBACK_SELF_CHECK_PROMPT_KEY } from "@/domain/training/requirements";
+import { selfAssessmentPromptKey } from "@/domain/training/self-assessment";
 import { applyStaleness, computeStaleArtifacts } from "@/domain/training/staleness";
 import { mutateRequestSchema, type MutateAction } from "@/lib/schemas/mutate-actions";
 import { apiError } from "@/lib/errors";
@@ -122,11 +124,32 @@ function applyMutation(
       return { ...current, stageResponses: [...current.stageResponses, response] };
     }
     case "completeSelfCheck": {
-      const response = buildStageResponse(current.session.id, "feedback", {
-        promptKey: "self_checklist_completed",
+      // 차원별 판단 6개 + 기존 완료 표시 1개를 함께 남긴다. 완료 표시를 계속 쓰는
+      // 이유는 `requirements.ts checkFeedback`이 이 promptKey로 완료를 판정하기
+      // 때문이다 — 자기 점검을 정규 단계로 올리면서도 그 계약은 건드리지 않는다.
+      const dimensionResponses = mutation.args.assessments.map((assessment) =>
+        buildStageResponse(current.session.id, "feedback", {
+          promptKey: selfAssessmentPromptKey(assessment.key),
+          content: assessment.status,
+        }),
+      );
+      const completionMarker = buildStageResponse(current.session.id, "feedback", {
+        promptKey: FEEDBACK_SELF_CHECK_PROMPT_KEY,
         content: "confirmed",
       });
-      return { ...current, stageResponses: [...current.stageResponses, response] };
+      // 다시 답하면 이전 판단을 남기지 않고 교체한다 — 대조표가 어느 것을 봐야 할지
+      // 모호해지면 안 된다(exploration의 promptKey 교체와 같은 방식).
+      const replacedKeys = new Set([
+        ...dimensionResponses.map((r) => r.promptKey),
+        FEEDBACK_SELF_CHECK_PROMPT_KEY,
+      ]);
+      const withoutOld = current.stageResponses.filter(
+        (r) => !(r.stage === "feedback" && replacedKeys.has(r.promptKey)),
+      );
+      return {
+        ...current,
+        stageResponses: [...withoutOld, ...dimensionResponses, completionMarker],
+      };
     }
   }
 }

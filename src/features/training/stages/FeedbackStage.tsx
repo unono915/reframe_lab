@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Badge, Button, Card, Field, Stack, Textarea } from "@/components/ui";
+import { Badge, Button, Card, cn, Field, Stack, Textarea } from "@/components/ui";
 import { contrastiveExampleFor } from "@/domain/training/contrastive";
 import { SELF_CHECK_ITEMS, type SelfCheckKey } from "@/domain/training/requirements";
 import {
@@ -16,6 +16,11 @@ import { StageShell } from "../StageShell";
 import { useTrainingSession } from "../TrainingSessionProvider";
 
 type AssessmentDraft = Partial<Record<SelfCheckKey, SelfAssessmentStatus>>;
+
+const SELF_CHECK_OPTIONS = [
+  { value: "shown", label: "드러나 있어요" },
+  { value: "not_yet", label: "아직이에요" },
+] as const satisfies readonly { value: SelfAssessmentStatus; label: string }[];
 
 /**
  * 돌아보기 단계 (RESEARCH_VALIDATION.md §5 P0-2·P0-4로 재구성).
@@ -181,31 +186,56 @@ export function FeedbackStage() {
             <Stack gap={3}>
               {SELF_CHECK_ITEMS.map((item) => (
                 <fieldset key={item.key} className="rounded-control bg-warm-gray px-4 py-3">
-                  <legend className="text-label font-bold text-ink">{item.label}</legend>
-                  <div className="mt-2 flex gap-4">
-                    {(
-                      [
-                        { value: "shown", label: "드러나 있어요" },
-                        { value: "not_yet", label: "아직이에요" },
-                      ] as const
-                    ).map((option) => (
-                      <label
-                        key={option.value}
-                        className="flex items-center gap-2 text-body text-ink"
-                      >
-                        <input
-                          type="radio"
-                          name={`self-check-${item.key}`}
-                          value={option.value}
-                          checked={draft[item.key] === option.value}
-                          onChange={() =>
-                            setDraft((prev) => ({ ...prev, [item.key]: option.value }))
-                          }
-                          className="h-5 w-5 accent-brand"
-                        />
-                        {option.label}
-                      </label>
-                    ))}
+                  {/*
+                    legend는 기본적으로 fieldset 테두리 위에 얹혀 렌더돼, 질문이 패널
+                    밖으로 빠져나가 선택지와 분리돼 보였다(질문이 두 줄이면 겹치기까지 했다).
+                    float로 일반 흐름에 넣어 패널 안에 들어오게 한다.
+                  */}
+                  <legend className="float-left w-full text-label font-bold text-ink">
+                    {item.label}
+                  </legend>
+                  {/*
+                    라디오 동그라미(20px)는 DESIGN.md §9.1의 최소 Touch Target
+                    44×44px에 못 미쳤고, 6개가 세로로 쌓여 화면이 매우 길어졌다.
+                    선택지 전체를 누를 수 있는 세그먼트로 바꾼다 — 입력은 여전히
+                    radio라 키보드·스크린리더 동작은 그대로다.
+                  */}
+                  <div className="clear-both grid grid-cols-2 gap-2 pt-2">
+                    {SELF_CHECK_OPTIONS.map((option) => {
+                      const selected = draft[item.key] === option.value;
+                      return (
+                        <label
+                          key={option.value}
+                          className={cn(
+                            "flex min-h-11 cursor-pointer items-center justify-center rounded-control px-3 text-center text-label transition-colors",
+                            "focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand",
+                            /*
+                              선택 상태에 solid brand + 흰 글자를 쓰면 14px 텍스트가
+                              약 4.1:1로 WCAG AA(4.5:1)에 못 미친다. DESIGN.md §4.3도
+                              24px 미만 텍스트에는 brand-strong을 쓰라고 규정한다 —
+                              Primary Button과 같은 조합(brand-soft + brand-strong)에
+                              brand Border를 더해 선택 여부를 색 하나에만 기대지 않는다.
+                              양쪽 모두 border-2라 선택해도 크기가 흔들리지 않는다.
+                            */
+                            selected
+                              ? "border-2 border-brand bg-brand-soft font-bold text-brand-strong"
+                              : "border-2 border-transparent bg-paper text-text-secondary",
+                          )}
+                        >
+                          <input
+                            type="radio"
+                            name={`self-check-${item.key}`}
+                            value={option.value}
+                            checked={selected}
+                            onChange={() =>
+                              setDraft((prev) => ({ ...prev, [item.key]: option.value }))
+                            }
+                            className="sr-only"
+                          />
+                          {option.label}
+                        </label>
+                      );
+                    })}
                   </div>
                 </fieldset>
               ))}

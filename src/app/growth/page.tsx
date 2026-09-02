@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Card, PageState, Stack } from "@/components/ui";
+import { Button, Card, cn, PageState, Stack } from "@/components/ui";
 import type { SessionSummary } from "@/domain/types";
 import {
   computeGrowthMetrics,
@@ -28,6 +28,10 @@ const MIN_SESSIONS_FOR_RHYTHM = 3;
 /** Dot 추이는 최근 것만 보여준다 — 수십 개가 늘어서면 변화를 읽을 수 없다. */
 const MAX_TREND_DOTS = 12;
 const TOTAL_DIMENSIONS = 6;
+/** `recentWeeks`는 항상 오래된 주 → 이번 주 순서로 4개다(metrics.ts). */
+const WEEK_LABELS = ["3주 전", "2주 전", "지난주", "이번 주"] as const;
+/** 막대 최대 높이(px). 이상치가 있어도 카드를 넘지 않게 하는 상한이다. */
+const BAR_MAX_HEIGHT = 56;
 
 function fetchGrowth() {
   return fetchJson<{ sessions: SessionSummary[] }>("/api/history");
@@ -81,7 +85,16 @@ export default function GrowthPage() {
     return <PageState status="loading" loadingLabel="기록을 불러오고 있어요." />;
   }
 
-  const maxWeekCount = Math.max(1, ...metrics.recentWeeks.map((w) => w.completedCount));
+  /*
+    한 주에 몰린 이상치(예: 과거 기록 이관으로 한 주에 35번)가 있으면, 최댓값을
+    기준으로 잡을 때 나머지 주가 전부 1px로 뭉개져 리듬을 읽을 수 없다.
+    두 번째로 큰 값을 기준으로 삼고 넘치는 막대는 **높이를 잘라서** 표시한다 —
+    기준만 바꾸고 높이를 제한하지 않으면 막대가 카드 밖으로 폭주한다(실제로 겪었다).
+  */
+  const sortedCounts = [...metrics.recentWeeks.map((w) => w.completedCount)].sort(
+    (a, b) => b - a,
+  );
+  const maxWeekCount = Math.max(1, sortedCounts[1] ?? sortedCounts[0] ?? 0);
 
   return (
     <main className="pt-safe pb-safe mx-auto flex min-h-dvh max-w-[640px] flex-col gap-8 px-5 py-10">
@@ -227,16 +240,38 @@ function RhythmSection({
         <Stack gap={3}>
           <p className="text-label font-bold text-text-secondary">최근 4주</p>
           <Stack direction="row" gap={3} align="end">
-            {metrics.recentWeeks.map((week) => (
-              <Stack key={week.weekStart} gap={1} align="center">
-                <div
-                  className="w-8 rounded-control bg-brand"
-                  style={{
-                    height: `${Math.max(8, (week.completedCount / maxWeekCount) * 64)}px`,
-                  }}
-                  aria-hidden="true"
-                />
-                <p className="text-caption text-text-tertiary">{week.completedCount}</p>
+            {metrics.recentWeeks.map((week, index) => (
+              <Stack key={week.weekStart} gap={1} align="center" className="flex-1">
+                {week.completedCount === 0 ? (
+                  /*
+                    0인 주에 채워진 막대를 두면 "조금 했다"로 읽힌다. 실제로 35 vs 0
+                    화면에서 0인 주가 활동이 있는 것처럼 보였다 — 빈 주는 점선으로
+                    비워 둬서 "없음"이 없음으로 보이게 한다.
+                  */
+                  <div
+                    className="h-1 w-full rounded-control border-b-2 border-dashed border-border"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <div
+                    className={cn(
+                      "w-full bg-brand",
+                      // 기준을 넘긴 막대는 위가 잘린 형태로 둬서 "더 있음"을 알린다.
+                      week.completedCount > maxWeekCount
+                        ? "rounded-b-control"
+                        : "rounded-control",
+                    )}
+                    style={{
+                      height: `${Math.min(
+                        BAR_MAX_HEIGHT,
+                        Math.max(6, (week.completedCount / maxWeekCount) * BAR_MAX_HEIGHT),
+                      )}px`,
+                    }}
+                    aria-hidden="true"
+                  />
+                )}
+                <p className="text-caption font-bold text-ink">{week.completedCount}</p>
+                <p className="text-caption text-text-tertiary">{WEEK_LABELS[index]}</p>
               </Stack>
             ))}
           </Stack>

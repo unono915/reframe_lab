@@ -4,8 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Card, LinkButton, PageState, Stack } from "@/components/ui";
 import type { SessionSummary, TrainingSession, TrainingTemplate } from "@/domain/types";
+import { daysSince, suggestRevisitCandidate } from "@/domain/growth/revisit";
 import { signOut } from "@/lib/auth/client";
 import { fetchJson } from "@/lib/fetch-json";
+
+function todayDateString(timezone: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(new Date());
+}
 
 function detectTimezone(): string {
   try {
@@ -58,6 +63,8 @@ export default function HomePage() {
   const [template, setTemplate] = useState<TrainingTemplate | null>(null);
   const [activeSession, setActiveSession] = useState<TrainingSession | null>(null);
   const [recentRecord, setRecentRecord] = useState<SessionSummary | null>(null);
+  const [revisitCandidate, setRevisitCandidate] = useState<SessionSummary | null>(null);
+  const [revisitDays, setRevisitDays] = useState(0);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState<string | null>(null);
 
@@ -93,6 +100,12 @@ export default function HomePage() {
     void fetchJson<{ sessions: SessionSummary[] }>("/api/history").then((result) => {
       if (cancelled || !result.ok) return;
       setRecentRecord(result.data.sessions.find((s) => s.status === "completed") ?? null);
+
+      // 같은 응답을 재사용한다 — 제안 하나를 위해 요청을 더 만들지 않는다.
+      const today = todayDateString(detectTimezone());
+      const candidate = suggestRevisitCandidate(result.data.sessions, today);
+      setRevisitCandidate(candidate);
+      setRevisitDays(candidate ? daysSince(candidate, today) : 0);
     });
     return () => {
       cancelled = true;
@@ -155,15 +168,38 @@ export default function HomePage() {
           </LinkButton>
         )}
 
-        {recentRecord && (
-          <Card variant="interactive" onClick={() => router.push(`/result/${recentRecord.id}`)}>
+        {/*
+          간격을 두고 다시 보기 (PRD §6.5 P1). 방금 쓴 정의는 머릿속 맥락이 남아
+          있어 무엇이 빠졌는지 보이지 않는다 — 2주쯤 지나 맥락이 흐려진 뒤에 읽어야
+          문장이 실제로 무엇을 담고 있는지 보인다.
+          후보가 있을 때는 "최근 기록"보다 이쪽이 더 할 만한 일이라 자리를 내준다.
+        */}
+        {revisitCandidate ? (
+          <Card
+            variant="interactive"
+            onClick={() => router.push(`/result/${revisitCandidate.id}`)}
+          >
             <Stack gap={2}>
-              <p className="text-label font-bold text-text-secondary">최근 다시 본 기록</p>
+              <p className="text-label font-bold text-brand-strong">다시 볼 만한 기록</p>
               <p className="line-clamp-2 text-body text-ink">
-                {recentRecord.latestDefinitionText ?? recentRecord.observationText}
+                {revisitCandidate.latestDefinitionText ?? revisitCandidate.observationText}
+              </p>
+              <p className="text-caption text-text-secondary">
+                {revisitDays}일 전에 쓴 문장이에요. 지금 다시 보면 어떻게 보일까요?
               </p>
             </Stack>
           </Card>
+        ) : (
+          recentRecord && (
+            <Card variant="interactive" onClick={() => router.push(`/result/${recentRecord.id}`)}>
+              <Stack gap={2}>
+                <p className="text-label font-bold text-text-secondary">최근 다시 본 기록</p>
+                <p className="line-clamp-2 text-body text-ink">
+                  {recentRecord.latestDefinitionText ?? recentRecord.observationText}
+                </p>
+              </Stack>
+            </Card>
+          )
         )}
       </Stack>
     </main>

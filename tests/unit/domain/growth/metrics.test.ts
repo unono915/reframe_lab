@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { computeGrowthMetrics } from "@/domain/growth/metrics";
+import { computeGrowthMetrics, computeShift } from "@/domain/growth/metrics";
+import { EMPTY_QUALITY_SIGNALS } from "@/domain/growth/quality";
 import type { SessionSummary } from "@/domain/types";
 
 const TODAY = "2026-08-15"; // 토요일, 그 주 월요일은 2026-08-10
@@ -16,6 +17,7 @@ function makeSummary(overrides: Partial<SessionSummary> = {}): SessionSummary {
     latestDefinitionText: "회의 시작 시각과 이동 동선이 맞지 않는다",
     userReframeCount: 0,
     hasUserRevisedDefinition: false,
+    qualitySignals: EMPTY_QUALITY_SIGNALS,
     ...overrides,
   };
 }
@@ -127,5 +129,105 @@ describe("computeGrowthMetrics — 정의 수정 완료 비율", () => {
 
   it("완료 세션이 0개면 비율은 0이다(0으로 나누지 않는다)", () => {
     expect(computeGrowthMetrics([], TODAY).revisedDefinitionRatio).toBe(0);
+  });
+});
+
+describe("computeShift — 초기 절반 대 최근 절반", () => {
+  it("표본이 4개 미만이면 추세를 말하지 않는다", () => {
+    expect(computeShift([0.1, 0.9])).toBeNull();
+    expect(computeShift([0.1, 0.5, 0.9])).toBeNull();
+  });
+
+  it("앞 절반과 뒤 절반의 평균을 비교한다", () => {
+    const shift = computeShift([0, 0, 1, 1]);
+    expect(shift?.earlier).toBe(0);
+    expect(shift?.recent).toBe(1);
+    expect(shift?.delta).toBe(1);
+    expect(shift?.sampleSize).toBe(4);
+  });
+
+  /**
+   * 홀수 표본에서 가운데 값을 양쪽에 모두 넣으면 차이가 과장된다 — 표본이 적을수록
+   * 그 왜곡이 커서, 가운데 한 점은 어느 쪽에도 넣지 않는다.
+   */
+  it("홀수면 가운데 점을 양쪽 어디에도 넣지 않는다", () => {
+    const shift = computeShift([0, 0, 100, 1, 1]);
+    expect(shift?.earlier).toBe(0);
+    expect(shift?.recent).toBe(1);
+  });
+});
+
+describe("computeGrowthMetrics — 품질 변화 지표", () => {
+  function withSignals(
+    trainingDate: string,
+    signals: Partial<SessionSummary["qualitySignals"]>,
+  ): SessionSummary {
+    return makeSummary({
+      trainingDate,
+      qualitySignals: { ...EMPTY_QUALITY_SIGNALS, ...signals },
+    });
+  }
+
+  it("차원 충족도 추이는 시간순(오래된 것 → 최근)이다", () => {
+    const metrics = computeGrowthMetrics(
+      [
+        withSignals("2026-08-14", { assessedDimensions: 6, shownDimensions: 6 }),
+        withSignals("2026-08-10", { assessedDimensions: 6, shownDimensions: 3 }),
+      ],
+      TODAY,
+    );
+    expect(metrics.coverageTrend.map((p) => p.trainingDate)).toEqual([
+      "2026-08-10",
+      "2026-08-14",
+    ]);
+    expect(metrics.coverageTrend.map((p) => p.value)).toEqual([0.5, 1]);
+  });
+
+  it("AI 판정이 없는 세션은 충족도 추이에서 빠진다", () => {
+    const metrics = computeGrowthMetrics(
+      [withSignals("2026-08-10", { assessedDimensions: 0, shownDimensions: 0 })],
+      TODAY,
+    );
+    expect(metrics.coverageTrend).toEqual([]);
+  });
+
+  it("비교 불가(null)인 세션은 보정 추이에서 빠진다", () => {
+    const metrics = computeGrowthMetrics(
+      [
+        withSignals("2026-08-10", { overconfidentDimensions: null }),
+        withSignals("2026-08-11", { overconfidentDimensions: 2 }),
+      ],
+      TODAY,
+    );
+    expect(metrics.calibrationTrend).toHaveLength(1);
+    expect(metrics.calibrationTrend[0]?.value).toBe(2);
+  });
+
+  it("AI 없이 완주한 세션을 따로 센다 (P1-6 전이 프로브)", () => {
+    const metrics = computeGrowthMetrics(
+      [
+        withSignals("2026-08-10", { completedWithoutAi: true }),
+        withSignals("2026-08-11", { completedWithoutAi: false }),
+      ],
+      TODAY,
+    );
+    expect(metrics.completedWithoutAiCount).toBe(1);
+  });
+
+  it("완료되지 않은 세션은 품질 추이에도 들어가지 않는다", () => {
+    const metrics = computeGrowthMetrics(
+      [
+        makeSummary({
+          status: "paused",
+          qualitySignals: {
+            ...EMPTY_QUALITY_SIGNALS,
+            assessedDimensions: 6,
+            shownDimensions: 6,
+          },
+        }),
+      ],
+      TODAY,
+    );
+    expect(metrics.coverageTrend).toEqual([]);
   });
 });

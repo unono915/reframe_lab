@@ -26,7 +26,10 @@ import type {
 } from "@/domain/training/builders";
 import { canAdvance as computeCanAdvance } from "@/domain/training/state-machine";
 import { STAGE_ORDER } from "@/domain/training/stages";
-import { EXCEPTION_PROMPT_KEYS } from "@/domain/training/requirements";
+import {
+  EXCEPTION_PROMPT_KEYS,
+  isSoloModeSession,
+} from "@/domain/training/requirements";
 import {
   clearSessionDrafts,
   createDebouncedDraftSaver,
@@ -141,6 +144,10 @@ export interface TrainingSessionContextValue {
     content: string,
   ) => Promise<void>;
   completeSelfCheck: (assessments: SelfAssessmentInput["assessments"]) => Promise<void>;
+  /** "오늘은 혼자 해보기" (P1-6). 켜면 이 세션에서 AI 도움을 쓰지 않는다. */
+  enableSoloMode: () => Promise<void>;
+  /** 이 세션이 혼자 하기로 선택된 상태인가. */
+  isSoloMode: boolean;
   requestHint: (
     hintLevel: HintLevel,
   ) => Promise<{ ok: true; question: string } | { ok: false; message: string }>;
@@ -455,6 +462,10 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
     [callMutate],
   );
 
+  const enableSoloMode = useCallback(async () => {
+    await callMutate({ action: "enableSoloMode", args: {} });
+  }, [callMutate]);
+
   const requestHint = useCallback(
     (
       hintLevel: HintLevel,
@@ -529,6 +540,8 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
     submitDefinition,
     submitExceptionReason,
     completeSelfCheck,
+    enableSoloMode,
+    isSoloMode: state.snapshot ? isSoloModeSession(state.snapshot) : false,
     requestHint,
     requestFeedback,
   };

@@ -1,5 +1,26 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { SessionSummary, TrainingSessionSnapshot } from "@/domain/types";
+import type {
+  AIFeedbackDimension,
+  HintLevel,
+  SessionSummary,
+  Stage,
+  TrainingSessionSnapshot,
+} from "@/domain/types";
+import { deriveQualitySignals } from "@/domain/growth/quality";
+import { SOLO_MODE_PROMPT_KEY } from "@/domain/training/requirements";
+import {
+  readSelfAssessmentFrom,
+  SELF_ASSESSMENT_PROMPT_PREFIX,
+} from "@/domain/training/self-assessment";
+
+/** `stage_responses`에서 자기 점검 행만 골라 받은 최소 형태. */
+interface SelfCheckRow {
+  session_id: string;
+  stage: string;
+  prompt_key: string;
+  content: string;
+  is_draft: boolean;
+}
 import type { Database } from "@/lib/supabase/database.types";
 import type { CreateSessionParams, SessionRepository } from "../types";
 import {
@@ -242,7 +263,7 @@ export function createSupabaseSessionRepository(
     ): Promise<SessionSummary[]> {
       const { data: sessionRows, error } = await client
         .from("training_sessions")
-        .select("id, training_date, status, template_id, origin_session_id")
+        .select("id, training_date, status, template_id, origin_session_id, ai_call_count")
         .eq("user_id", userId)
         .order("started_at", { ascending: false })
         .limit(limit);
@@ -250,17 +271,46 @@ export function createSupabaseSessionRepository(
       if (!sessionRows || sessionRows.length === 0) return [];
 
       const ids = sessionRows.map((row) => row.id);
-      const [observationsResult, definitionsResult, reframesResult] = await Promise.all([
+      const [
+        observationsResult,
+        definitionsResult,
+        reframesResult,
+        feedbacksResult,
+        interactionsResult,
+        selfChecksResult,
+      ] = await Promise.all([
         client.from("observations").select("session_id, raw_text").in("session_id", ids),
         client
           .from("problem_definition_versions")
-          .select("session_id, version_number, text, author_type")
+          .select("id, session_id, version_number, text, author_type")
           .in("session_id", ids),
         // 개수만 필요하지만 PostgREST의 그룹 집계는 뷰가 필요하다 — id만 골라
         // 받아서 애플리케이션에서 센다(행당 uuid 하나라 전송량이 작다).
         client.from("reframes").select("session_id, author_type").in("session_id", ids),
+        // 아래 3개가 품질 변화 지표(P1-5)의 원천이다. 전부 `in(session_id)` 배치라
+        // 세션 수와 무관하게 쿼리 수는 그대로 상수로 유지된다.
+        client
+          .from("ai_feedbacks")
+          .select("session_id, problem_definition_version_id, dimensions, is_stale, created_at")
+          .in("session_id", ids),
+        client.from("coach_interactions").select("session_id, hint_level").in("session_id", ids),
+        // 자기 점검(feedback 단계)과 "혼자 해보기" 표식을 한 번에 가져온다.
+        client
+          .from("stage_responses")
+          .select("session_id, stage, prompt_key, content, is_draft")
+          .or(
+            `prompt_key.like.${SELF_ASSESSMENT_PROMPT_PREFIX}*,prompt_key.eq.${SOLO_MODE_PROMPT_KEY}`,
+          )
+          .in("session_id", ids),
       ]);
-      for (const result of [observationsResult, definitionsResult, reframesResult]) {
+      for (const result of [
+        observationsResult,
+        definitionsResult,
+        reframesResult,
+        feedbacksResult,
+        interactionsResult,
+        selfChecksResult,
+      ]) {
         if (result.error) throw result.error;
       }
 
@@ -271,15 +321,54 @@ export function createSupabaseSessionRepository(
       const latestDefinitionBySession = new Map<string, string>();
       const revisedSessions = new Set<string>();
       const latestVersionBySession = new Map<string, number>();
+      const latestVersionIdBySession = new Map<string, string>();
       for (const row of definitionsResult.data ?? []) {
         const seen = latestVersionBySession.get(row.session_id) ?? 0;
         if (row.version_number > seen) {
           latestVersionBySession.set(row.session_id, row.version_number);
           latestDefinitionBySession.set(row.session_id, row.text);
+          latestVersionIdBySession.set(row.session_id, row.id);
         }
         if (row.version_number > 1 && row.author_type === "user") {
           revisedSessions.add(row.session_id);
         }
+      }
+
+      // 최신 정의에 달린, 아직 유효한 피드백만 품질 신호로 본다 — 앞 단계를 고쳐
+      // stale이 된 피드백을 "그때는 좋았다"로 세면 추이가 거짓이 된다.
+      const dimensionsBySession = new Map<string, Record<string, AIFeedbackDimension>>();
+      const feedbackCreatedAt = new Map<string, string>();
+      for (const row of feedbacksResult.data ?? []) {
+        if (row.is_stale) continue;
+        if (row.problem_definition_version_id !== latestVersionIdBySession.get(row.session_id)) {
+          continue;
+        }
+        const seenAt = feedbackCreatedAt.get(row.session_id);
+        if (seenAt && seenAt >= row.created_at) continue;
+        feedbackCreatedAt.set(row.session_id, row.created_at);
+        dimensionsBySession.set(
+          row.session_id,
+          (row.dimensions ?? {}) as unknown as Record<string, AIFeedbackDimension>,
+        );
+      }
+
+      const hintLevelsBySession = new Map<string, HintLevel[]>();
+      for (const row of interactionsResult.data ?? []) {
+        const list = hintLevelsBySession.get(row.session_id) ?? [];
+        list.push(row.hint_level as HintLevel);
+        hintLevelsBySession.set(row.session_id, list);
+      }
+
+      const selfChecksBySession = new Map<string, SelfCheckRow[]>();
+      const soloModeSessions = new Set<string>();
+      for (const row of selfChecksResult.data ?? []) {
+        if (row.prompt_key === SOLO_MODE_PROMPT_KEY) {
+          if (!row.is_draft) soloModeSessions.add(row.session_id);
+          continue;
+        }
+        const list = selfChecksBySession.get(row.session_id) ?? [];
+        list.push(row);
+        selfChecksBySession.set(row.session_id, list);
       }
 
       const userReframeCounts = new Map<string, number>();
@@ -298,6 +387,20 @@ export function createSupabaseSessionRepository(
         latestDefinitionText: latestDefinitionBySession.get(row.id) ?? null,
         userReframeCount: userReframeCounts.get(row.id) ?? 0,
         hasUserRevisedDefinition: revisedSessions.has(row.id),
+        qualitySignals: deriveQualitySignals({
+          dimensions: dimensionsBySession.get(row.id) ?? null,
+          selfAssessment: readSelfAssessmentFrom(
+            (selfChecksBySession.get(row.id) ?? []).map((r) => ({
+              stage: r.stage as Stage,
+              promptKey: r.prompt_key,
+              content: r.content,
+              isDraft: r.is_draft,
+            })),
+          ),
+          hintLevels: hintLevelsBySession.get(row.id) ?? [],
+          aiCallCount: row.ai_call_count,
+          soloMode: soloModeSessions.has(row.id),
+        }),
       }));
     },
   };

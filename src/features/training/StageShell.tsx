@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Stack } from "@/components/ui";
+import { Badge, Button, Stack } from "@/components/ui";
 import type { Stage } from "@/domain/types";
 import {
   stageIndex,
@@ -60,8 +60,15 @@ export function StageShell({
   onPrimaryAction,
 }: StageShellProps) {
   const router = useRouter();
-  const { snapshot, canAdvance, advance, pause, conflictingDrafts, dismissConflictingDraft } =
-    useTrainingSession();
+  const {
+    snapshot,
+    canAdvance,
+    advance,
+    pause,
+    conflictingDrafts,
+    dismissConflictingDraft,
+    isSoloMode,
+  } = useTrainingSession();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -139,6 +146,8 @@ export function StageShell({
           읽도록 h1으로 두되, 시각적 스타일은 기존 안내 문장 그대로 유지한다.
         */}
         <h1 className="text-body text-text-secondary">{description}</h1>
+        {/* 어떤 모드인지 매 화면에서 보이게 한다 — 힌트 버튼이 없는 이유가 설명돼야 한다. */}
+        {isSoloMode && <Badge variant="neutral">오늘은 코치 없이 해보는 중</Badge>}
         <StageRationale stage={currentStage} />
         {children}
         <PastStagesSummary currentStage={currentStage} />

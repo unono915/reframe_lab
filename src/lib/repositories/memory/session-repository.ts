@@ -1,5 +1,8 @@
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
 import type { SessionSummary, TrainingSessionSnapshot } from "@/domain/types";
+import { deriveQualitySignals } from "@/domain/growth/quality";
+import { isSoloModeSession } from "@/domain/training/requirements";
+import { readSelfAssessmentFrom } from "@/domain/training/self-assessment";
 import type { CreateSessionParams, SessionRepository } from "../types";
 
 /**
@@ -148,6 +151,11 @@ function toSummary(snapshot: TrainingSessionSnapshot): SessionSummary {
   const latest = [...snapshot.problemDefinitionVersions].sort(
     (a, b) => b.versionNumber - a.versionNumber,
   )[0];
+  // 최신 정의에 달린, 아직 유효한(=stale 아닌) 피드백만 품질 신호로 본다.
+  const latestFeedback = snapshot.aiFeedbacks
+    .filter((f) => !f.isStale && f.problemDefinitionVersionId === latest?.id)
+    .at(-1);
+
   return {
     id: snapshot.session.id,
     trainingDate: snapshot.session.trainingDate,
@@ -160,5 +168,12 @@ function toSummary(snapshot: TrainingSessionSnapshot): SessionSummary {
     hasUserRevisedDefinition: snapshot.problemDefinitionVersions.some(
       (v) => v.versionNumber > 1 && v.authorType === "user",
     ),
+    qualitySignals: deriveQualitySignals({
+      dimensions: latestFeedback?.dimensions ?? null,
+      selfAssessment: readSelfAssessmentFrom(snapshot.stageResponses),
+      hintLevels: snapshot.coachInteractions.map((ci) => ci.hintLevel),
+      aiCallCount: snapshot.session.aiCallCount,
+      soloMode: isSoloModeSession(snapshot),
+    }),
   };
 }

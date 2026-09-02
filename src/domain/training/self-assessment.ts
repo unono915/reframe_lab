@@ -1,4 +1,4 @@
-import type { AIFeedback, TrainingSessionSnapshot } from "@/domain/types";
+import type { AIFeedback, StageResponse, TrainingSessionSnapshot } from "@/domain/types";
 import { SELF_CHECK_ITEMS, type SelfCheckKey } from "./requirements";
 
 /**
@@ -77,14 +77,23 @@ export function normalizeAiDimensionStatus(
   return status === "shown" ? "shown" : "not_yet";
 }
 
-/** 스냅샷에 저장된 사용자 자기평가를 읽는다. 아직 답하지 않은 차원은 키가 없다. */
-export function readSelfAssessment(
-  snapshot: TrainingSessionSnapshot,
+/**
+ * 자기평가를 읽는 데 필요한 최소 형태. 전체 스냅샷을 만들 수 없는 곳(목록 조회처럼
+ * 세션마다 스냅샷을 조립하면 N+1이 되는 경로)에서도 같은 판정을 쓰기 위해 분리했다.
+ */
+type SelfAssessmentSource = Pick<
+  StageResponse,
+  "stage" | "promptKey" | "content" | "isDraft"
+>;
+
+/** 저장된 자기평가를 읽는다. 아직 답하지 않은 차원은 키가 없다. */
+export function readSelfAssessmentFrom(
+  responses: readonly SelfAssessmentSource[],
 ): Partial<Record<SelfCheckKey, SelfAssessmentStatus>> {
   const result: Partial<Record<SelfCheckKey, SelfAssessmentStatus>> = {};
 
   for (const item of SELF_CHECK_ITEMS) {
-    const response = snapshot.stageResponses.find(
+    const response = responses.find(
       (r) =>
         r.stage === "feedback" &&
         r.promptKey === selfAssessmentPromptKey(item.key) &&
@@ -96,6 +105,13 @@ export function readSelfAssessment(
   }
 
   return result;
+}
+
+/** 스냅샷에 저장된 사용자 자기평가를 읽는다. 아직 답하지 않은 차원은 키가 없다. */
+export function readSelfAssessment(
+  snapshot: TrainingSessionSnapshot,
+): Partial<Record<SelfCheckKey, SelfAssessmentStatus>> {
+  return readSelfAssessmentFrom(snapshot.stageResponses);
 }
 
 /** 6개 차원에 모두 답했는가. AI 피드백 요청을 여는 조건이다(사용자가 먼저 판단한다). */

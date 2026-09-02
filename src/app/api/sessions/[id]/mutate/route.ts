@@ -9,7 +9,10 @@ import {
   buildReframe,
   buildStageResponse,
 } from "@/domain/training/builders";
-import { FEEDBACK_SELF_CHECK_PROMPT_KEY } from "@/domain/training/requirements";
+import {
+  FEEDBACK_SELF_CHECK_PROMPT_KEY,
+  SOLO_MODE_PROMPT_KEY,
+} from "@/domain/training/requirements";
 import { selfAssessmentPromptKey } from "@/domain/training/self-assessment";
 import { applyStaleness, computeStaleArtifacts } from "@/domain/training/staleness";
 import { mutateRequestSchema, type MutateAction } from "@/lib/schemas/mutate-actions";
@@ -122,6 +125,20 @@ function applyMutation(
         mutation.args,
       );
       return { ...current, stageResponses: [...current.stageResponses, response] };
+    }
+    case "enableSoloMode": {
+      // 이미 켜져 있으면 중복 기록하지 않는다. 끄는 경로를 두지 않는 이유는,
+      // 중간에 마음이 바뀌어 AI를 쓰면 `aiCallCount > 0`이 되어 자동으로 전이
+      // 프로브에서 빠지기 때문이다 — 표식을 지울 필요가 없다.
+      const already = current.stageResponses.some(
+        (r) => r.promptKey === SOLO_MODE_PROMPT_KEY && !r.isDraft,
+      );
+      if (already) return current;
+      const marker = buildStageResponse(current.session.id, "observation", {
+        promptKey: SOLO_MODE_PROMPT_KEY,
+        content: "confirmed",
+      });
+      return { ...current, stageResponses: [...current.stageResponses, marker] };
     }
     case "completeSelfCheck": {
       // 차원별 판단 6개 + 기존 완료 표시 1개를 함께 남긴다. 완료 표시를 계속 쓰는

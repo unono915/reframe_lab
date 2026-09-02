@@ -144,6 +144,17 @@ export default function HomePage() {
           {isResuming ? "이어서 하기" : "오늘의 훈련 시작"}
         </LinkButton>
 
+        {/*
+          P1-6 전이 프로브. 이어서 하는 세션에는 띄우지 않는다 — 이미 AI를 썼을 수
+          있어서 "혼자 했다"는 기록이 정확하지 않게 된다.
+          Primary와 경쟁하지 않도록 작은 글씨 링크로 둔다.
+        */}
+        {!isResuming && (
+          <LinkButton href={`${trainingHref}?solo=1`} variant="tertiary" fullWidth>
+            오늘은 코치 없이 해보기
+          </LinkButton>
+        )}
+
         {recentRecord && (
           <Card variant="interactive" onClick={() => router.push(`/result/${recentRecord.id}`)}>
             <Stack gap={2}>

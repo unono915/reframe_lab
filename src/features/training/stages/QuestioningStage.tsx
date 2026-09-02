@@ -13,6 +13,7 @@ export function QuestioningStage() {
     addQuestion,
     markPriorityQuestion,
     requestHint,
+    isSoloMode,
     submitExceptionReason,
     awaitLatestSnapshot,
     advance,
@@ -141,9 +142,12 @@ export function QuestioningStage() {
           />
         </Field>
         <Stack direction="row" gap={2}>
-          <Button type="button" variant="tertiary" onClick={handleHint} disabled={hintPending}>
-            {hintPending ? "힌트 요청 중" : hintError ? "다시 시도" : "힌트 보기"}
-          </Button>
+          {/* 혼자 하기로 한 세션에서는 AI 도움을 아예 노출하지 않는다 (P1-6). */}
+          {!isSoloMode && (
+            <Button type="button" variant="tertiary" onClick={handleHint} disabled={hintPending}>
+              {hintPending ? "힌트 요청 중" : hintError ? "다시 시도" : "힌트 보기"}
+            </Button>
+          )}
           <Button type="button" variant="primary" onClick={handleAdd}>
             질문 추가하기
           </Button>

@@ -30,8 +30,15 @@ type AssessmentDraft = Partial<Record<SelfCheckKey, SelfAssessmentStatus>>;
  */
 export function FeedbackStage() {
   const router = useRouter();
-  const { snapshot, template, requestFeedback, completeSelfCheck, submitDefinition, advance } =
-    useTrainingSession();
+  const {
+    snapshot,
+    template,
+    isSoloMode,
+    requestFeedback,
+    completeSelfCheck,
+    submitDefinition,
+    advance,
+  } = useTrainingSession();
 
   const [feedbackPending, setFeedbackPending] = useState(false);
   const [feedbackError, setFeedbackError] = useState<string | null>(null);
@@ -234,8 +241,19 @@ export function FeedbackStage() {
           )}
         </Stack>
 
-        {/* 2) 그다음에야 AI 피드백을 연다. */}
-        {assessmentSaved && !editing && (
+        {/*
+          2) 그다음에야 AI 피드백을 연다. 혼자 하기로 한 세션에서는 이 영역 자체가
+          없다 — 자기 점검만으로 완주하는 것이 이 세션의 목적이기 때문이다(P1-6).
+        */}
+        {assessmentSaved && !editing && isSoloMode && (
+          <Card variant="neutral">
+            <p className="text-body text-ink">
+              오늘은 코치 없이 해보기로 했어요. 위 자기 점검이 오늘의 확인이에요.
+            </p>
+          </Card>
+        )}
+
+        {assessmentSaved && !editing && !isSoloMode && (
           <Stack gap={3}>
             <p className="text-heading-3 font-bold text-ink">코치의 시선과 견줘보기</p>
 

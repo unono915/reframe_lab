@@ -48,6 +48,8 @@ export const mutateActionSchema = z.discriminatedUnion("action", [
   // (RESEARCH_VALIDATION.md §5 P0-2). 완료 표시(self_checklist_completed)도 함께 남겨
   // `requirements.ts checkFeedback`의 기존 판정은 그대로 유지된다.
   z.object({ action: z.literal("completeSelfCheck"), args: selfAssessmentInputSchema }),
+  // "오늘은 혼자 해보기" (P1-6 전이 프로브). 인자가 없다 — 켜기만 하고 끄지 않는다.
+  z.object({ action: z.literal("enableSoloMode"), args: z.object({}) }),
 ]);
 
 /**

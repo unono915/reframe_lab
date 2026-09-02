@@ -252,6 +252,32 @@ export interface TrainingSession {
  * (DEVELOPMENT_PLAN.md §6 "조회 모델·계산 함수")의 "조회 모델"이 바로 이것이다 —
  * 저장되는 실체가 아니라 기존 테이블에서 매번 파생시키는 읽기 전용 뷰다.
  */
+/**
+ * 세션 하나의 **품질 신호** (RESEARCH_VALIDATION.md §5 P1-5). 계산은
+ * `domain/growth/quality.ts`가 하고, 타입만 여기 둔다 — 다른 도메인 타입과 같은 자리.
+ */
+export interface SessionQualitySignals {
+  /** AI가 실제로 판정한 차원 수(분모). 피드백이 없으면 0. */
+  assessedDimensions: number;
+  /** 그중 'shown' 판정을 받은 수(분자). */
+  shownDimensions: number;
+  /**
+   * 자기평가는 'shown'인데 AI는 아니라고 본 차원 수. 자기평가나 AI 판정 중
+   * 하나라도 없으면 null — 0("어긋남 없음")과 구분해야 추이가 왜곡되지 않는다.
+   */
+  overconfidentDimensions: number | null;
+  /** 이 세션에서 요청한 AI 힌트 수. */
+  hintCallCount: number;
+  /** 그중 Level 2(가장 구체적인 힌트). */
+  strongHintCount: number;
+  /**
+   * 사용자가 **스스로 선택해서** AI 없이 완주했는가 (P1-6 전이 프로브).
+   * PRD §1.6-7 "AI 없이도 능력이 향상되어야 한다"를 관측할 수 있는 유일한 신호다.
+   * 우연히 AI를 안 쓴 세션은 여기 포함되지 않는다.
+   */
+  completedWithoutAi: boolean;
+}
+
 export interface SessionSummary {
   id: string;
   trainingDate: string;
@@ -266,6 +292,11 @@ export interface SessionSummary {
   userReframeCount: number;
   /** Growth "정의를 다시 써본 기록" 집계용 — 사용자가 쓴 v2 이상이 있는지. */
   hasUserRevisedDefinition: boolean;
+  /**
+   * Growth 품질 변화 지표의 원천 (P1-5). 위 두 필드가 "얼마나 많이 했나"라면
+   * 이쪽은 "무엇이 달라졌나"다 — 계산은 `domain/growth/quality.ts`가 한다.
+   */
+  qualitySignals: SessionQualitySignals;
 }
 
 /**

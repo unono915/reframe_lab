@@ -24,6 +24,29 @@ export const EXPLORATION_REQUIRED_PROMPT_KEYS = [
 export const FEEDBACK_SELF_CHECK_PROMPT_KEY = "self_checklist_completed";
 
 /**
+ * "오늘은 혼자 해보기" 표식 (RESEARCH_VALIDATION.md §5 P1-6 전이 프로브).
+ *
+ * PRD §1.6-7은 이 제품의 최종 주장을 이렇게 적어두었다 — "장기적으로 **AI 없이도**
+ * 새로운 장면을 관찰하고 정의하는 능력이 향상되어야 한다." 그런데 앱 안에서 관측할 수
+ * 있는 것은 전부 AI를 쓰는 상태의 행동이라, 그 주장을 확인할 방법이 없었다.
+ *
+ * 사용자가 **스스로 선택해서** AI 없이 완주한 세션만이 그 증거가 된다. 그래서 우연히
+ * AI를 안 쓴 것(예: 제공자가 연결되기 전의 과거 기록)과 구분하려고 명시적 표식을 남긴다 —
+ * 이 구분이 없으면 Growth가 "혼자 해낸 기록"을 실제보다 부풀려 보여준다.
+ *
+ * 별도 컬럼 없이 `StageResponse` 예약 promptKey를 쓰는 것은 `EXCEPTION_PROMPT_KEYS`와
+ * 같은 방식이다 — 세션 시작 시점에 한 번 기록되고 이후 바뀌지 않는다.
+ */
+export const SOLO_MODE_PROMPT_KEY = "solo_mode";
+
+/** 이 세션을 사용자가 "AI 없이" 하기로 선택했는가. */
+export function isSoloModeSession(snapshot: TrainingSessionSnapshot): boolean {
+  return snapshot.stageResponses.some(
+    (r) => r.promptKey === SOLO_MODE_PROMPT_KEY && !r.isDraft,
+  );
+}
+
+/**
  * 위 경로에서 사용자가 직접 확인하는 체크리스트 문항 (PRD §7.8 6개 평가 차원).
  * UI 문구지만 `lib/ai/`가 아니라 여기 둔다 — AI 판단이 아니라 이 요건 자체가 요구하는
  * 자기 점검 항목이고, `features/`가 `lib/ai/`를 직접 import하지 못하게 막은 레이어

@@ -244,3 +244,57 @@ export function hasMinimalUserInput(stage: Stage, snapshot: TrainingSessionSnaps
       );
   }
 }
+
+/**
+ * 아직 무엇이 남았는지 한 줄로 알려준다. 요건을 이미 채웠으면 null.
+ *
+ * 왜 필요한가 — Primary 버튼은 `canAdvance`가 false면 그냥 비활성화됐고, **왜 안
+ * 되는지는 어디에도 없었다.** 사용자는 질문을 두 개만 쓰고 버튼을 눌러본 뒤 아무
+ * 일도 일어나지 않는 경험을 하게 된다(이 프로젝트에서 반복된 "조용한 실패"의 또 다른
+ * 형태다).
+ *
+ * 부수적으로 학습 효과도 있다. 루브릭 연구가 말하는 기제는 **기준의 투명성**이다 —
+ * "질문 3개"라는 기준을 숨기지 않고 보여주는 편이 낫다. 다만 남은 개수만 말하고
+ * 무엇을 쓰라고는 말하지 않는다(원칙 3).
+ */
+export function describeRemainingRequirement(
+  stage: Stage,
+  snapshot: TrainingSessionSnapshot,
+): string | null {
+  if (stage === "not_started") return null;
+  if (checkStageRequirement(stage, snapshot).met) return null;
+
+  switch (stage) {
+    case "observation":
+      return "본 장면을 한 줄이라도 적으면 다음으로 넘어갈 수 있어요.";
+    case "separation":
+      return "문장을 하나 이상 분류하고 확인해주세요.";
+    case "questioning": {
+      const userQuestions = snapshot.questions.filter((q) => q.authorType === "user").length;
+      const missingQuestions = Math.max(0, 3 - userQuestions);
+      const needsPriority = !snapshot.questions.some(
+        (q) => q.isPriority && Boolean(q.priorityReason?.trim()),
+      );
+      const parts = [
+        missingQuestions > 0 ? `질문 ${missingQuestions}개` : null,
+        needsPriority ? "핵심 질문 고르기" : null,
+      ].filter(Boolean);
+      return `${parts.join(", ")}가 남았어요.`;
+    }
+    case "exploration": {
+      const answered = EXPLORATION_REQUIRED_PROMPT_KEYS.filter((key) =>
+        findStageResponse(snapshot, "exploration", key),
+      ).length;
+      const remaining = EXPLORATION_REQUIRED_PROMPT_KEYS.length - answered;
+      return `아직 답하지 않은 질문이 ${remaining}개 있어요.`;
+    }
+    case "reframing": {
+      const userReframes = snapshot.reframes.filter((r) => r.authorType === "user").length;
+      return `대안 프레임 ${Math.max(0, 2 - userReframes)}개를 더 써보면 넘어갈 수 있어요.`;
+    }
+    case "definition":
+      return "현재의 문제 정의를 적어주세요.";
+    case "feedback":
+      return "자기 점검을 마치면 완료할 수 있어요.";
+  }
+}

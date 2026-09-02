@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  describeRemainingRequirement,
   checkStageRequirement,
   EXCEPTION_PROMPT_KEYS,
   hasMinimalUserInput,
@@ -409,5 +410,54 @@ describe("SELF_CHECK_ITEMS", () => {
     expect(SELF_CHECK_ITEMS).toHaveLength(6);
     const keys = new Set(SELF_CHECK_ITEMS.map((item) => item.key));
     expect(keys.size).toBe(6);
+  });
+});
+
+describe("describeRemainingRequirement", () => {
+  it("요건을 채웠으면 아무 말도 하지 않는다", () => {
+    const snapshot = makeSnapshot({ questions: passingQuestions() });
+    expect(describeRemainingRequirement("questioning", snapshot)).toBeNull();
+  });
+
+  it("남은 질문 개수와 핵심 질문 선택을 함께 알려준다", () => {
+    const snapshot = makeSnapshot({ questions: [makeQuestion()] });
+    const message = describeRemainingRequirement("questioning", snapshot);
+    expect(message).toContain("2개");
+    expect(message).toContain("핵심 질문");
+  });
+
+  it("질문 수만 모자라면 핵심 질문 얘기는 하지 않는다", () => {
+    const snapshot = makeSnapshot({
+      questions: [
+        makeQuestion({ isPriority: true, priorityReason: "가장 반복적임" }),
+        makeQuestion(),
+      ],
+    });
+    const message = describeRemainingRequirement("questioning", snapshot);
+    expect(message).toContain("1개");
+    expect(message).not.toContain("핵심 질문");
+  });
+
+  it("탐색은 남은 질문 수를 센다", () => {
+    const snapshot = makeSnapshot({
+      stageResponses: passingExplorationResponses().slice(0, 2),
+    });
+    expect(describeRemainingRequirement("exploration", snapshot)).toContain("2개");
+  });
+
+  it("재정의는 더 써야 할 프레임 수를 센다", () => {
+    const snapshot = makeSnapshot({ reframes: [makeReframe()] });
+    expect(describeRemainingRequirement("reframing", snapshot)).toContain("1개");
+  });
+
+  /** 남은 개수만 말하고 "무엇을 쓰라"고는 말하지 않는다 — 원칙 3. */
+  it("무엇을 쓰라고 지시하지 않는다", () => {
+    const snapshot = makeSnapshot({ questions: [makeQuestion()] });
+    const message = describeRemainingRequirement("questioning", snapshot) ?? "";
+    expect(message).not.toMatch(/예를 들어|이렇게 쓰|추천/);
+  });
+
+  it("not_started에는 안내할 요건이 없다", () => {
+    expect(describeRemainingRequirement("not_started", makeSnapshot())).toBeNull();
   });
 });

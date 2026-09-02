@@ -11,6 +11,7 @@ import {
   stageRationale,
   TOTAL_ACTIVE_STAGES,
 } from "@/domain/training/stages";
+import { describeRemainingRequirement } from "@/domain/training/requirements";
 import { toUserMessage } from "@/lib/fetch-json";
 import { PastStagesSummary } from "./PastStagesSummary";
 import { useTrainingSession } from "./TrainingSessionProvider";
@@ -76,6 +77,12 @@ export function StageShell({
 
   const currentStage = snapshot.session.currentStage;
   const position = stageIndex(currentStage) + 1;
+  /*
+    각 단계는 버튼을 눌렀을 때 검증 메시지를 내지만, 그건 **눌러본 뒤에야** 알 수 있다.
+    남은 요건을 미리 보여주면 사용자가 헛클릭 없이 진행할 수 있다.
+    클릭 오류가 떠 있는 동안에는 감춰서 두 문구가 겹치지 않게 한다.
+  */
+  const remaining = describeRemainingRequirement(currentStage, snapshot);
 
   async function handleExit() {
     await pause();
@@ -158,6 +165,16 @@ export function StageShell({
           {error && (
             <p role="alert" className="text-caption font-bold text-danger">
               {error}
+            </p>
+          )}
+          {/*
+            버튼이 왜 눌리지 않는지 말해준다. 예전에는 그냥 비활성화만 돼 있어서,
+            조건을 못 채운 사용자는 아무 설명 없이 막혔다.
+            aria-live로 두는 이유는 조건을 채우는 동안 문구가 바뀌기 때문이다.
+          */}
+          {!error && remaining && (
+            <p className="text-caption text-text-secondary" aria-live="polite">
+              {remaining}
             </p>
           )}
           <Button

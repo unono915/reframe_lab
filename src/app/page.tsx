@@ -4,13 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Card, LinkButton, PageState, Stack } from "@/components/ui";
 import type { SessionSummary, TrainingSession, TrainingTemplate } from "@/domain/types";
-import { daysSince, suggestRevisitCandidate } from "@/domain/growth/revisit";
 import { signOut } from "@/lib/auth/client";
 import { fetchJson } from "@/lib/fetch-json";
-
-function todayDateString(timezone: string): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(new Date());
-}
 
 function detectTimezone(): string {
   try {
@@ -97,15 +92,15 @@ export default function HomePage() {
 
   useEffect(() => {
     let cancelled = false;
-    void fetchJson<{ sessions: SessionSummary[] }>("/api/history").then((result) => {
+    // 카드 두 개를 위해 기록 전체를 받아오지 않는다 — 서버가 골라서 준다(/api/home).
+    void fetchJson<{
+      recentRecord: SessionSummary | null;
+      revisitCandidate: { session: SessionSummary; days: number } | null;
+    }>(`/api/home?timezone=${encodeURIComponent(detectTimezone())}`).then((result) => {
       if (cancelled || !result.ok) return;
-      setRecentRecord(result.data.sessions.find((s) => s.status === "completed") ?? null);
-
-      // 같은 응답을 재사용한다 — 제안 하나를 위해 요청을 더 만들지 않는다.
-      const today = todayDateString(detectTimezone());
-      const candidate = suggestRevisitCandidate(result.data.sessions, today);
-      setRevisitCandidate(candidate);
-      setRevisitDays(candidate ? daysSince(candidate, today) : 0);
+      setRecentRecord(result.data.recentRecord);
+      setRevisitCandidate(result.data.revisitCandidate?.session ?? null);
+      setRevisitDays(result.data.revisitCandidate?.days ?? 0);
     });
     return () => {
       cancelled = true;

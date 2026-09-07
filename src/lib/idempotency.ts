@@ -5,6 +5,10 @@ import type { Database } from "@/lib/supabase/database.types";
  * `client_request_id`가 이미 처리된 적이 있으면 그때의 응답을 그대로 돌려주고,
  * 없으면 null을 반환한다 — 호출자가 정상적으로 처리한 뒤 `recordIdempotentResponse`로
  * 기록한다. 사용자별로 격리된다(RLS: user_id = auth.uid()).
+ *
+ * 만료된 키는 없는 것으로 본다. 정리는 시간별 cron(`purge_expired_idempotency_keys`,
+ * migration 0009)이 하지만, 그 작업이 멈춰도 18일 전 응답이 되살아나면 안 되므로
+ * 조회 시점에서도 한 번 더 거른다.
  */
 export async function findIdempotentResponse(
   client: SupabaseClient<Database>,
@@ -16,6 +20,7 @@ export async function findIdempotentResponse(
     .select("response_status, response_body")
     .eq("user_id", userId)
     .eq("client_request_id", clientRequestId)
+    .gt("expires_at", new Date().toISOString())
     .maybeSingle();
   if (error) throw error;
   if (!data) return null;

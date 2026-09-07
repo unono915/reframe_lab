@@ -120,6 +120,7 @@ export type Database = {
         Row: {
           client_request_id: string;
           created_at: string;
+          expires_at: string;
           response_body: Json;
           response_status: number;
           user_id: string;
@@ -127,6 +128,7 @@ export type Database = {
         Insert: {
           client_request_id: string;
           created_at?: string;
+          expires_at?: string;
           response_body: Json;
           response_status: number;
           user_id: string;
@@ -134,6 +136,7 @@ export type Database = {
         Update: {
           client_request_id?: string;
           created_at?: string;
+          expires_at?: string;
           response_body?: Json;
           response_status?: number;
           user_id?: string;

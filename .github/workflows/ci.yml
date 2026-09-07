@@ -30,6 +30,19 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     needs: typecheck-lint-test
+    # E2E는 실제 Supabase 프로젝트를 대상으로 돈다(로그인·RLS·RPC를 진짜로 통과해야
+    # 의미가 있다). 그래서 아래 4개 시크릿이 필요하다:
+    #   E2E_SUPABASE_URL / E2E_SUPABASE_ANON_KEY — 앱 빌드·실행용
+    #   E2E_TEST_EMAIL / E2E_TEST_PASSWORD       — 이메일 인증을 마친 전용 테스트 계정
+    #
+    # 시크릿이 없으면 테스트를 "돌린 척"하지 않고 건너뛴다. 예전에는 자격증명이
+    # 없어도 job이 초록으로 끝났는데, 그 초록은 아무것도 검증하지 않은 초록이었다 —
+    # 실제로 완주 테스트 4개가 2주 가까이 깨진 채로 지나갔다(2026-09-08 발견).
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
+      E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
+      E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -37,10 +50,23 @@ jobs:
           node-version: "22"
           cache: "npm"
       - run: npm ci
-      - run: npx playwright install --with-deps chromium webkit
-      - run: npm run test:e2e
-      - uses: actions/upload-artifact@v4
-        if: always()
+
+      - id: creds
+        name: E2E 자격증명 확인
+        run: |
+          if [ -n "$E2E_TEST_EMAIL" ] && [ -n "$E2E_TEST_PASSWORD" ] && [ -n "$NEXT_PUBLIC_SUPABASE_URL" ] && [ -n "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=E2E를 건너뜁니다::시크릿(E2E_SUPABASE_URL, E2E_SUPABASE_ANON_KEY, E2E_TEST_EMAIL, E2E_TEST_PASSWORD)이 없어 브라우저 테스트를 실행하지 않았습니다. 이 워크플로는 지금 훈련 완주 경로를 전혀 검증하지 못합니다."
+          fi
+
+      - if: steps.creds.outputs.ready == 'true'
+        run: npx playwright install --with-deps chromium webkit
+      - if: steps.creds.outputs.ready == 'true'
+        run: npm run test:e2e
+      - if: always() && steps.creds.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
         with:
           name: playwright-report
           path: playwright-report/

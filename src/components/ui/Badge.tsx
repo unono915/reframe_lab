@@ -8,7 +8,13 @@ const variantClasses: Record<BadgeVariant, string> = {
   brand: "bg-brand-soft text-brand-strong",
   ai: "bg-brand-soft text-brand-strong",
   user: "bg-cream text-ink",
-  system: "bg-warm-gray text-text-tertiary",
+  /*
+    text-tertiary(#6F766F)는 DESIGN.md 대비 표에서 `canvas` 위(4.56:1)만 검증돼 있다.
+    더 어두운 `warm-gray`(#EEE8DE) 위에서는 3.83:1로 떨어져 WCAG AA(4.5:1)에 미달한다 —
+    axe 검사로 실제 위반이 잡혔다. 토큰 값은 그대로 두고, 같은 배경에서 4.92:1이
+    나오는 text-secondary로 짝을 바꾼다(neutral 변형이 이미 쓰는 조합이다).
+  */
+  system: "bg-warm-gray text-text-secondary",
   stale: "bg-warning-bg text-warning",
 };
 

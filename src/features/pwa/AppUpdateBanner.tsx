@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSerwist } from "@serwist/turbopack/react";
 import { Button, Card, Stack } from "@/components/ui";
 
@@ -20,13 +20,29 @@ export function AppUpdateBanner() {
   const [updateReady, setUpdateReady] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const [updating, setUpdating] = useState(false);
+  /**
+   * 사용자가 '지금 업데이트'를 눌렀는지. state가 아니라 ref인 이유는 아래 이벤트
+   * 핸들러가 등록 시점의 값을 붙잡고 있으면 안 되기 때문이다.
+   */
+  const userAskedToUpdate = useRef(false);
 
   useEffect(() => {
     if (!serwist) return;
 
     const onWaiting = () => setUpdateReady(true);
-    // 새 워커가 페이지를 넘겨받은 뒤에야 새로고침한다 — 그래야 새 버전으로 뜬다.
-    const onControlling = () => window.location.reload();
+
+    /**
+     * `controlling`은 "새 워커가 이 페이지를 넘겨받았다"는 신호인데, 업데이트일
+     * 때만 오는 게 아니다 — sw.ts가 `clientsClaim: true`라 **맨 처음 설치될 때도**
+     * 온다. 조건 없이 새로고침했더니 앱을 처음 여는 사람의 페이지가 로그인 도중에
+     * 리로드됐다(입력하던 값이 날아갈 수 있는 자리다. 실제로 E2E 로그인이 이것
+     * 때문에 실패해서 발견했다).
+     *
+     * 그래서 사용자가 직접 업데이트를 누른 경우에만 새로고침한다.
+     */
+    const onControlling = () => {
+      if (userAskedToUpdate.current) window.location.reload();
+    };
 
     serwist.addEventListener("waiting", onWaiting);
     serwist.addEventListener("controlling", onControlling);
@@ -54,6 +70,7 @@ export function AppUpdateBanner() {
               variant="primary"
               disabled={updating}
               onClick={() => {
+                userAskedToUpdate.current = true;
                 setUpdating(true);
                 serwist?.messageSkipWaiting();
               }}

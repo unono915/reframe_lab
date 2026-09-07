@@ -25,7 +25,29 @@ export default async function globalSetup(config: FullConfig) {
   await page.getByLabel("이메일").fill(email);
   await page.getByLabel("비밀번호", { exact: true }).fill(password);
   await page.getByRole("button", { name: "로그인" }).click();
-  await page.waitForURL((url) => !url.pathname.startsWith("/auth/"));
+
+  try {
+    await page.waitForURL((url) => !url.pathname.startsWith("/auth/"));
+  } catch (cause) {
+    // 실패하면 Playwright는 "waitForURL 타임아웃"만 보여준다 — 정작 화면에는
+    // 원인이 적혀 있는데(잘못된 자격증명, 이메일 미인증, Supabase 오류) 그것이
+    // 로그에 안 남아 매번 처음부터 다시 조사하게 된다. 화면의 안내를 함께 남긴다.
+    const onScreen = await page
+      .getByRole("alert")
+      .allInnerTexts()
+      .catch(() => [] as string[]);
+    await browser.close();
+    throw new Error(
+      [
+        "E2E 로그인에 실패했습니다.",
+        onScreen.length > 0
+          ? `화면 안내: ${onScreen.join(" / ")}`
+          : "화면에 표시된 오류 안내가 없습니다(네트워크·서버 문제일 수 있습니다).",
+        `계정: ${email}`,
+      ].join(" · "),
+      { cause },
+    );
+  }
 
   await page.context().storageState({ path: STORAGE_STATE_PATH });
   await browser.close();

@@ -113,8 +113,16 @@ export function StageShell({
         <Button variant="tertiary" onClick={handleExit} aria-label="훈련 나가기">
           나가기
         </Button>
+        {/* DESIGN.md §18.5 "Progress가 Screen Reader에 단계명과 함께 전달되는가?".
+            눈으로는 "3 / 7 질문"이 읽기 좋지만, 스크린 리더에는 "3 슬래시 7 질문"으로
+            나가 무엇이 3인지 알 수 없다. 보이는 표기는 그대로 두고 읽히는 문장만 따로 둔다. */}
         <p className="text-label font-bold text-text-secondary" aria-live="polite">
-          {position} / {TOTAL_ACTIVE_STAGES} {stageLabel(currentStage)}
+          <span aria-hidden="true">
+            {position} / {TOTAL_ACTIVE_STAGES} {stageLabel(currentStage)}
+          </span>
+          <span className="sr-only">
+            {TOTAL_ACTIVE_STAGES}단계 중 {position}단계, {stageLabel(currentStage)}
+          </span>
         </p>
         <span aria-hidden="true" className="w-16" />
       </header>

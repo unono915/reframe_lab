@@ -16,6 +16,20 @@ interface Bucket {
 
 const buckets = new Map<string, Bucket>();
 
+/**
+ * 버킷을 정리하기 시작하는 크기. 이 Map은 사용자가 나타날 때마다 항목이 늘기만 하고
+ * 줄지 않아서, 프로세스가 오래 살아 있으면 창이 지난 지 한참 된 항목까지 계속 들고
+ * 있게 된다 — `idempotency_keys`가 만료 없이 자라던 것과 같은 모양이다(migration 0009).
+ * 여기서는 창이 지난 항목이 곧 쓸모없는 항목이라 판정이 간단하다.
+ */
+const SWEEP_THRESHOLD = 10_000;
+
+function sweepExpired(now: number, windowMs: number): void {
+  for (const [key, bucket] of buckets) {
+    if (now - bucket.windowStart >= windowMs) buckets.delete(key);
+  }
+}
+
 export interface RateLimitResult {
   ok: boolean;
   retryAfterMs?: number;
@@ -29,6 +43,9 @@ export function checkRateLimit(
 ): RateLimitResult {
   const bucket = buckets.get(userId);
   if (!bucket || now - bucket.windowStart >= windowMs) {
+    // 정리는 새 창을 여는 순간에만, 그것도 임계치를 넘었을 때만 한다 — 매 호출마다
+    // 전체를 훑으면 Rate Limit 검사 자체가 사용자 수에 비례해 느려진다.
+    if (buckets.size > SWEEP_THRESHOLD) sweepExpired(now, windowMs);
     buckets.set(userId, { count: 1, windowStart: now });
     return { ok: true };
   }

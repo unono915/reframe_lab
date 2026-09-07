@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import Link from "next/link";
 import { Button, Field, Input, Stack } from "@/components/ui";
-import { requestPasswordReset } from "@/lib/auth/client";
+import { prefetchAuthClient, requestPasswordReset } from "@/lib/auth/client";
 import {
   passwordResetRequestInputSchema,
   type PasswordResetRequestInput,
@@ -14,6 +14,12 @@ import { AuthShell } from "./AuthShell";
 
 export function PasswordResetRequestForm() {
   const [sent, setSent] = useState(false);
+
+  // 인증 SDK는 동적으로 불러온다(lib/auth/client.ts). 사용자가 입력하는 동안 미리
+  // 받아두면 제출 시점에는 이미 준비돼 있어, 지연 로딩의 비용이 드러나지 않는다.
+  useEffect(() => {
+    prefetchAuthClient();
+  }, []);
   const {
     register,
     handleSubmit,

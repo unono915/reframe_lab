@@ -489,6 +489,29 @@ Home(`app/page.tsx`)이 `signOut`을 정적으로 import했고, 그 한 줄이
 
 ---
 
+### 보안 응답 헤더가 하나도 없었다
+
+CSP·nosniff·frame-ancestors·Referrer-Policy·Permissions-Policy 전부 없었다.
+`next.config.ts`의 `headers()`로 붙였고, CSP의 `connect-src`는 `NEXT_PUBLIC_SUPABASE_URL`에서
+origin을 뽑아 **정확히 그 출처만** 연다 — `https:`처럼 넓게 열면 토큰을 아무 데나
+보내는 코드가 주입돼도 막지 못한다.
+
+`script-src`에는 `'unsafe-inline'`이 남아 있다. Next가 하이드레이션 부트스트랩을
+인라인 `<script>`로 넣기 때문이고, 없애려면 proxy에서 nonce를 발급해야 한다.
+그 한 줄이 빠져도 나머지가 막는 것이 적지 않다 — 클릭재킹(`frame-ancestors 'none'`),
+`<base>` 주입, form을 통한 유출(`form-action 'self'`), 외부 전송(`connect-src`),
+플러그인 실행(`object-src 'none'`).
+
+**이런 헤더는 없어져도 아무것도 깨지지 않는다** — 화면은 그대로 뜨고 테스트도
+통과한다. 그래서 값을 E2E에 못 박았다(`security-headers.spec.ts`). 로그인이 필요 없는
+경로만 써서, 자격증명 시크릿이 없는 CI에서도 이 검사만은 돌아간다.
+
+적용 전에는 모든 화면을 돌며 콘솔의 CSP 위반을 세는 임시 테스트를 먼저 돌렸다 —
+CSP 위반은 테스트를 실패시키지 않고 조용히 글꼴이 대체되거나 이미지가 안 뜨는 식으로
+나빠지기 때문이다. 위반 0건을 확인한 뒤 적용했다.
+
+---
+
 ### 검증
 
 typecheck·lint·단위 333개 통과(신규 17개: `useMutationAction` 5, offset 경계 1,

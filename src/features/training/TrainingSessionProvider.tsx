@@ -519,7 +519,10 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
           { question: string | null; snapshot: TrainingSessionSnapshot } & Partial<ApiErrorBody>
         >(response);
         if (!response.ok || !body) {
-          return { ok: false, message: body?.message ?? "힌트를 가져오지 못했어요." };
+          return {
+            ok: false,
+            message: body?.message ?? "힌트를 가져오지 못했어요.",
+          };
         }
         commit(body.snapshot);
 
@@ -530,7 +533,10 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
         // 보여줄 것이 없는 성공은 호출자에게 성공이 아니므로 여기서 걸러낸다.
         const question = body.question?.trim() ?? "";
         if (!question) {
-          return { ok: false, message: "힌트를 받지 못했어요. 잠시 후 다시 시도해주세요." };
+          return {
+            ok: false,
+            message: "힌트를 받지 못했어요. 잠시 후 다시 시도해주세요.",
+          };
         }
         return { ok: true, question };
       }),

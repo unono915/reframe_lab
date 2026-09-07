@@ -59,6 +59,37 @@ async function breakAiRoutes(page: Page): Promise<void> {
   );
 }
 
+/**
+ * 대기 상태 자체의 회귀 테스트 (DESIGN.md §11 "AI Loading", §9.18).
+ *
+ * 제공자 타임아웃이 20초다. 그동안 화면에서 바뀌는 것이 버튼 글자 하나뿐이면,
+ * 사용자 입장에서는 "눌렸는데 아무 일도 안 일어난다"와 구분되지 않는다 — 이
+ * 프로젝트에서 네 번 재발한 바로 그 증상이다. 응답을 일부러 늦춰 대기 카드가
+ * 실제로 뜨는지, 응답이 오면 자리를 비켜주는지 확인한다.
+ */
+test("AI를 기다리는 동안 무엇을 기다리는지 보인다", async ({ page }) => {
+  // 단계 입력 + 실제 제공자 호출 + 일부러 넣은 2초 지연. 기본 30초로는 모자란다.
+  test.setTimeout(90_000);
+  await page.goto("/training/new");
+  await fillStagesUntilQuestioning(page);
+  await page.getByLabel("새 질문").fill("왜 이 사람만 늦을까?");
+  await page.getByRole("button", { name: "질문 추가하기" }).click();
+
+  // 실제 응답을 그대로 쓰되 2초 늦춘다 — 대기 구간을 관찰 가능한 길이로 만든다.
+  await page.route("**/api/sessions/*/coach", async (route) => {
+    const response = await route.fetch();
+    await new Promise((resolve) => setTimeout(resolve, 2_000));
+    await route.fulfill({ response });
+  });
+
+  await page.getByRole("button", { name: "힌트 보기" }).click();
+  await expect(page.getByText("다음 질문을 정리하고 있어요.")).toBeVisible();
+  // 응답이 오면 대기 카드는 사라진다 — 그 자리에 힌트가 들어선다.
+  await expect(page.getByText("다음 질문을 정리하고 있어요.")).toBeHidden({
+    timeout: 30_000,
+  });
+});
+
 test("힌트 요청이 서버 오류로 실패하면 사용자에게 오류가 보인다", async ({ page }) => {
   await page.goto("/training/new");
   await fillStagesUntilQuestioning(page);
@@ -72,6 +103,8 @@ test("힌트 요청이 서버 오류로 실패하면 사용자에게 오류가 �
 
   // 침묵하지 않는 것이 핵심이다 — 무엇이 잘못됐는지와 다시 시도할 방법이 보여야 한다.
   await expect(appAlert(page)).toHaveText(/\S/);
+  // AI 실패가 "쓴 것도 날아갔다"로 읽히면 안 된다 (DESIGN.md §11 AI Error, 원칙 8).
+  await expect(appAlert(page)).toContainText("작성한 내용은 그대로 있어요");
   await expect(page.getByRole("button", { name: "다시 시도" })).toBeVisible();
 
   // 그리고 세션 자체는 멀쩡해야 한다 — 계속 쓸 수 있다.
@@ -85,6 +118,10 @@ test("힌트 요청이 서버 오류로 실패하면 사용자에게 오류가 �
  * 성공 응답이라 오류도 안 뜨고, 질문이 없으니 힌트 카드도 안 뜬다. AI 호출 비용만 나간다.
  */
 test("서버가 빈 질문을 돌려줘도 화면이 침묵하지 않는다", async ({ page }) => {
+  // 이 테스트만 실제 제공자를 부른다(응답을 받아 question만 비우기 위해). 제공자
+  // 타임아웃이 20초라 기본 예산으로는 정상 동작에서도 시간을 넘긴다 — 그리고 그렇게
+  // 넘긴 요청이 세션을 붙잡은 채 다음 테스트까지 깨뜨렸다(iOS Safari에서 실제로 발생).
+  test.setTimeout(90_000);
   await page.goto("/training/new");
   await fillStagesUntilQuestioning(page);
   await page.getByLabel("새 질문").fill("왜 이 사람만 늦을까?");
@@ -102,7 +139,7 @@ test("서버가 빈 질문을 돌려줘도 화면이 침묵하지 않는다", as
   });
 
   await page.getByRole("button", { name: "힌트 보기" }).click();
-  await expect(appAlert(page)).toHaveText(/\S/);
+  await expect(appAlert(page)).toHaveText(/\S/, { timeout: 30_000 });
 });
 
 test("AI가 완전히 죽어도 7단계를 완주할 수 있다 (원칙 8)", async ({ page }) => {

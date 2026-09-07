@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { HintLevel } from "@/domain/types";
 import { Button, Card, Field, Stack, Textarea } from "@/components/ui";
 import { EXCEPTION_PROMPT_KEYS } from "@/domain/training/requirements";
+import { CoachLoadingCard } from "../CoachLoadingCard";
 import { InlineError } from "../InlineError";
 import { StageShell } from "../StageShell";
 import { useTrainingSession } from "../TrainingSessionProvider";
@@ -176,11 +177,16 @@ export function QuestioningStage() {
         </Stack>
         <InlineError message={addAction.error} />
         {hintError && (
+          // 안심 문장은 실패 사유와 별개로 **항상** 붙인다(DESIGN.md §11 AI Error).
+          // 메시지 문자열에 섞어 넣으면 서버가 더 구체적인 사유를 줄 때 사라진다 —
+          // 정작 그때가 사용자가 가장 불안한 순간이다. FeedbackStage와 같은 방식이다.
           <p role="alert" className="text-caption font-bold text-danger">
-            {hintError}
+            {hintError} 작성한 내용은 그대로 있어요.
           </p>
         )}
-        {hintText && (
+        {/* 최대 20초를 기다리는 자리다. 버튼 글자만 바뀌면 눌린 건지 멈춘 건지 알 수 없다. */}
+        {hintPending && <CoachLoadingCard label="다음 질문을 정리하고 있어요." />}
+        {hintText && !hintPending && (
           <Card variant="coach">
             <p className="text-body-lg text-ink">{hintText}</p>
           </Card>

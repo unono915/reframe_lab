@@ -12,6 +12,7 @@ import {
   readSelfAssessment,
   type SelfAssessmentStatus,
 } from "@/domain/training/self-assessment";
+import { CoachLoadingCard } from "../CoachLoadingCard";
 import { InlineError } from "../InlineError";
 import { StageShell } from "../StageShell";
 import { useTrainingSession } from "../TrainingSessionProvider";
@@ -346,6 +347,10 @@ export function FeedbackStage() {
                   >
                     {feedbackError} 위 자기 점검만으로도 완료할 수 있어요.
                   </p>
+                )}
+                {/* 피드백도 같은 20초 대기다 — 무엇을 기다리는지 문장으로 알린다. */}
+                {feedbackPending && (
+                  <CoachLoadingCard label="쓰신 내용을 살펴보고 있어요." />
                 )}
                 <Button
                   type="button"

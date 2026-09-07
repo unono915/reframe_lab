@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchJson, NETWORK_ERROR_MESSAGE, toUserMessage } from "@/lib/fetch-json";
+import {
+  fetchJson,
+  NETWORK_ERROR_MESSAGE,
+  toDisplayMessage,
+  toUserMessage,
+  UserFacingError,
+} from "@/lib/fetch-json";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -80,5 +86,26 @@ describe("toUserMessage", () => {
   it("Error가 아닌 값이 던져져도 안전하게 처리한다", () => {
     expect(typeof toUserMessage("문자열이 throw됨")).toBe("string");
     expect(typeof toUserMessage(undefined)).toBe("string");
+  });
+});
+
+describe("toDisplayMessage — 우리 메시지와 브라우저 예외를 가른다", () => {
+  it("UserFacingError의 메시지는 그대로 보여준다", () => {
+    expect(toDisplayMessage(new UserFacingError("오늘의 렌즈를 불러오지 못했어요."))).toBe(
+      "오늘의 렌즈를 불러오지 못했어요.",
+    );
+  });
+
+  it("네트워크 예외는 연결 안내로 바꾼다 — 영어 원문을 그대로 두지 않는다", () => {
+    const message = toDisplayMessage(new TypeError("Failed to fetch"));
+    expect(message).toBe(NETWORK_ERROR_MESSAGE);
+    expect(message).not.toMatch(/fetch/i);
+  });
+
+  it("라이브러리가 던진 영어 예외도 그대로 노출하지 않는다", () => {
+    // IndexedDB·Supabase SDK 등이 던지는 영어 메시지가 화면에 뜨면 안 된다.
+    const message = toDisplayMessage(new Error("QuotaExceededError: storage full"));
+    expect(message).not.toContain("QuotaExceeded");
+    expect(message).toContain("작성한 내용은 그대로 있어요");
   });
 });

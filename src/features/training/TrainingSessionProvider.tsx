@@ -39,6 +39,7 @@ import {
   type DraftRecord,
 } from "@/lib/persistence/drafts";
 import { findConflictingDrafts } from "@/lib/persistence/reconciliation";
+import { toDisplayMessage, UserFacingError } from "@/lib/fetch-json";
 import type { MutateAction } from "@/lib/schemas/mutate-actions";
 import type {
   explorationPromptKeySchema,
@@ -246,7 +247,7 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
         const body = await parseJsonSafe<{ snapshot: TrainingSessionSnapshot } & Partial<ApiErrorBody>>(
           response,
         );
-        if (!body) return { ok: false, message: "저장하지 못했습니다. 작성한 내용은 그대로 있어요." };
+        if (!body) return { ok: false, message: "저장하지 못했어요. 작성한 내용은 그대로 있어요." };
 
         // 실패 응답도 서버가 함께 보내주는 최신 스냅샷으로 갱신한다 — 다른 기기가 먼저
         // 진행시킨 경우 이 기기도 그 최신 상태를 즉시 보게 된다(§7.3 409 규약).
@@ -291,7 +292,7 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
           const timezone = timezoneRef.current;
           const todayRes = await fetch(`/api/templates/today?timezone=${encodeURIComponent(timezone)}`);
           const todayBody = await parseJsonSafe<{ template: TrainingTemplate }>(todayRes);
-          if (!todayBody) throw new Error("오늘의 렌즈를 불러오지 못했습니다.");
+          if (!todayBody) throw new UserFacingError("오늘의 렌즈를 불러오지 못했어요.");
 
           const createRes = await fetch("/api/sessions", {
             method: "POST",
@@ -304,7 +305,8 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
             }),
           });
           const createBody = await parseJsonSafe<{ snapshot: TrainingSessionSnapshot }>(createRes);
-          if (!createRes.ok || !createBody) throw new Error("세션을 시작하지 못했습니다.");
+          if (!createRes.ok || !createBody)
+            throw new UserFacingError("훈련을 시작하지 못했어요. 잠시 후 다시 시도해주세요.");
           snapshot = createBody.snapshot;
         } else if (snapshot.session.status === "paused") {
           // /training 진입 자체가 "이어서 하기" 행동이다.
@@ -336,7 +338,8 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
         if (!cancelled) {
           dispatch({
             type: "error",
-            message: err instanceof Error ? err.message : "세션을 불러오지 못했습니다.",
+            // 우리가 쓴 안내는 살리고, 브라우저 예외는 한국어 문장으로 바꾼다.
+            message: toDisplayMessage(err),
           });
         }
       }

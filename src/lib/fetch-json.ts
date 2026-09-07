@@ -17,6 +17,26 @@ export const NETWORK_ERROR_MESSAGE =
 
 const UNKNOWN_ERROR_MESSAGE = "잠시 문제가 생겼어요. 작성한 내용은 그대로 있어요.";
 
+/**
+ * 사용자에게 그대로 보여줘도 되는 메시지를 담은 오류.
+ *
+ * 브라우저·라이브러리가 던지는 영어 예외와 구분하기 위해 쓴다. 구분이 없으면
+ * catch 한 곳에서 둘이 섞여 "TypeError: Failed to fetch"가 한국어 화면에 그대로
+ * 뜬다 — 실제로 훈련 화면과 세션 로딩 두 곳에서 그랬다(DESIGN.md §15.2는 오류
+ * 문구를 "원인과 다음 행동을 구체적으로 설명"하도록 규정한다).
+ */
+export class UserFacingError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "UserFacingError";
+  }
+}
+
+/** 우리가 쓴 메시지는 그대로, 그 밖의 예외는 사용자 문장으로 바꾼다. */
+export function toDisplayMessage(error: unknown): string {
+  return error instanceof UserFacingError ? error.message : toUserMessage(error);
+}
+
 export type FetchResult<T> = { ok: true; data: T } | { ok: false; message: string };
 
 interface ApiErrorBody {

@@ -30,7 +30,10 @@ export function Badge({ variant = "neutral", className, children, ...props }: Ba
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-pill px-3 py-1 text-caption font-bold",
+        // 배지는 짧은 라벨이라 줄이 바뀌면 안 된다. 좁은 화면에서 옆 문장이
+        // 길어지면 flex가 배지를 눌러 "드러 / 남"처럼 쪼개졌다 — 눌리지 않게 하고
+        // 줄바꿈도 막는다.
+        "inline-flex shrink-0 items-center whitespace-nowrap rounded-pill px-3 py-1 text-caption font-bold",
         variantClasses[variant],
         className,
       )}

@@ -12,6 +12,18 @@
     font-family: var(--font-sans);
     font-size: var(--text-body);
     line-height: var(--text-body--line-height);
+
+    /*
+      한국어 줄바꿈. 기본값(`normal`)은 한글을 글자 단위로 끊어서, 좁은 화면에서
+      "같은 규칙이 어떤 사람 / 에게만 다르게" 처럼 **단어 중간에서** 줄이 바뀐다.
+      화면이 좁을수록(=이 앱의 1차 타깃인 iPhone) 자주 일어나고, 짧은 배지에서는
+      "드러 / 남" 같은 모양까지 나온다.
+
+      `keep-all`은 어절을 지키는 대신, 컨테이너보다 긴 한 덩어리(긴 URL 등)를
+      만나면 넘쳐버린다 — `overflow-wrap: anywhere`가 그 경우에만 끊어준다.
+    */
+    word-break: keep-all;
+    overflow-wrap: anywhere;
   }
 
   /* DESIGN.md §14.2: outline: none으로 Focus를 제거하지 않는다 */

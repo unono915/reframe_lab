@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { computeGrowthMetrics, computeShift } from "@/domain/growth/metrics";
+import {
+  computeGrowthMetrics,
+  computeShift,
+  weeklyBarHeightPx,
+} from "@/domain/growth/metrics";
 import { EMPTY_QUALITY_SIGNALS } from "@/domain/growth/quality";
 import type { SessionSummary } from "@/domain/types";
 
@@ -229,5 +233,46 @@ describe("computeGrowthMetrics — 품질 변화 지표", () => {
       TODAY,
     );
     expect(metrics.coverageTrend).toEqual([]);
+  });
+});
+
+describe("weeklyBarHeightPx", () => {
+  const MAX = 56;
+
+  it("큰 값이 반드시 더 커 보인다 — 이 성질 하나가 이 함수의 전부다", () => {
+    // 실제로 그려졌던 화면: 3번 한 주와 159번 한 주의 막대가 똑같은 높이였다.
+    // 두 번째로 큰 값(3)을 기준으로 잡고 넘치는 막대를 잘랐기 때문인데, 잘렸다는
+    // 표시가 없어서 읽는 사람은 두 주가 같았다고 이해한다.
+    const small = weeklyBarHeightPx(3, 159, MAX);
+    const large = weeklyBarHeightPx(159, 159, MAX);
+    expect(large).toBeGreaterThan(small);
+    expect(large).toBe(MAX);
+  });
+
+  it("한 주만 많아도 나머지 주가 사라지지 않는다", () => {
+    // "했는데 안 한 것처럼" 보이는 것도 같은 종류의 거짓말이다.
+    expect(weeklyBarHeightPx(1, 500, MAX)).toBeGreaterThanOrEqual(6);
+  });
+
+  it("0인 주는 높이가 없다 — 화면에서는 점선으로 비워 둔다", () => {
+    expect(weeklyBarHeightPx(0, 10, MAX)).toBe(0);
+  });
+
+  it("어떤 값에서도 상한을 넘지 않는다 — 막대가 카드 밖으로 나가면 안 된다", () => {
+    for (const count of [1, 7, 35, 159, 10_000]) {
+      expect(weeklyBarHeightPx(count, 3, MAX)).toBeLessThanOrEqual(MAX);
+    }
+  });
+
+  it("값의 순서와 높이의 순서가 어긋나지 않는다", () => {
+    const counts = [0, 1, 2, 5, 9, 40, 159];
+    const heights = counts.map((c) => weeklyBarHeightPx(c, 159, MAX));
+    for (let i = 1; i < heights.length; i += 1) {
+      expect(heights[i]!).toBeGreaterThanOrEqual(heights[i - 1]!);
+    }
+  });
+
+  it("모든 주가 0이어도 나눗셈이 깨지지 않는다", () => {
+    expect(weeklyBarHeightPx(0, 0, MAX)).toBe(0);
   });
 });

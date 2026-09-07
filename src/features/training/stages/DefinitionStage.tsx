@@ -32,7 +32,13 @@ export function DefinitionStage() {
       <Field
         id="definition-text"
         label="현재의 문제 정의"
-        helperText="이 기기에 저장했어요."
+        /*
+          DESIGN.md §11 "Draft Saved"는 초안이 **저장됐을 때** 보여주는 안내다.
+          늘 띄워두면 아무것도 쓰지 않은 빈 입력창 아래에서도 "저장했어요"라고
+          말하게 된다 — 사실이 아니고, 정작 진짜 저장됐을 때의 안심 효과도 사라진다.
+          쓴 내용이 있을 때만 보여준다(디바운스 500ms 뒤 실제로 기록된다).
+        */
+        helperText={text.trim() ? "이 기기에 저장했어요." : undefined}
       >
         <Textarea
           value={text}

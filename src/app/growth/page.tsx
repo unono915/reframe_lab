@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Card, cn, PageState, Stack } from "@/components/ui";
+import { weeklyBarHeightPx } from "@/domain/growth/metrics";
 import type {
   GrowthMetrics,
   QualityTrendPoint,
@@ -86,16 +87,13 @@ export default function GrowthPage() {
     return <PageState status="loading" loadingLabel="기록을 불러오고 있어요." />;
   }
 
-  /*
-    한 주에 몰린 이상치(예: 과거 기록 이관으로 한 주에 35번)가 있으면, 최댓값을
-    기준으로 잡을 때 나머지 주가 전부 1px로 뭉개져 리듬을 읽을 수 없다.
-    두 번째로 큰 값을 기준으로 삼고 넘치는 막대는 **높이를 잘라서** 표시한다 —
-    기준만 바꾸고 높이를 제한하지 않으면 막대가 카드 밖으로 폭주한다(실제로 겪었다).
-  */
-  const sortedCounts = [...metrics.recentWeeks.map((w) => w.completedCount)].sort(
-    (a, b) => b - a,
+  // 기준은 실제 최댓값이다. 두 번째로 큰 값을 기준으로 삼고 넘치는 막대를 자르던
+  // 방식은, 3번 한 주와 159번 한 주를 **같은 높이**로 그렸다(둘 다 상한에 걸린다).
+  // 자세한 근거는 `weeklyBarHeightPx` 주석 참고.
+  const maxWeekCount = Math.max(
+    1,
+    ...metrics.recentWeeks.map((w) => w.completedCount),
   );
-  const maxWeekCount = Math.max(1, sortedCounts[1] ?? sortedCounts[0] ?? 0);
 
   return (
     <main className="pt-safe pb-safe mx-auto flex min-h-dvh max-w-[640px] flex-col gap-8 px-5 py-10">
@@ -263,9 +261,10 @@ function RhythmSection({
                         : "rounded-control",
                     )}
                     style={{
-                      height: `${Math.min(
+                      height: `${weeklyBarHeightPx(
+                        week.completedCount,
+                        maxWeekCount,
                         BAR_MAX_HEIGHT,
-                        Math.max(6, (week.completedCount / maxWeekCount) * BAR_MAX_HEIGHT),
                       )}px`,
                     }}
                     aria-hidden="true"
@@ -286,9 +285,15 @@ function RhythmSection({
       <Card variant="paper">
         <Stack gap={2}>
           <p className="text-label font-bold text-text-secondary">직접 쓴 것들</p>
+          {/*
+            "그중"은 앞의 프레임 개수를 가리키는 것처럼 읽히는데 실제로는 **기록 수**다
+            (프레임 394개 중 1개가 아니라, 기록 197번 중 1번). 세는 단위가 다르면
+            문장을 나눈다 — 이 화면은 숫자가 사실대로 읽히는 것이 전부인 곳이다.
+          */}
           <p className="text-body text-ink">
-            대안 프레임 {metrics.userAuthoredReframeCount}개를 직접 썼고, 그중{" "}
-            {metrics.revisedDefinitionSessionCount}번은 처음 정의를 스스로 고쳐썼어요.
+            대안 프레임 {metrics.userAuthoredReframeCount}개를 직접 썼어요. 그리고{" "}
+            {metrics.revisedDefinitionSessionCount}번의 기록에서 처음 정의를 스스로
+            고쳐썼어요.
           </p>
         </Stack>
       </Card>

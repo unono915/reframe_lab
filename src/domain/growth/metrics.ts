@@ -171,3 +171,34 @@ export function computeShift(values: readonly number[]): TrendShift | null {
 
   return { earlier, recent, delta: recent - earlier, sampleSize: values.length };
 }
+
+/**
+ * 주간 리듬 막대의 높이(px). 순수 계산이라 여기 둔다 — 화면에서 직접 계산하면
+ * 아래 성질을 테스트로 잠글 자리가 없다.
+ *
+ * 규칙은 하나다: **큰 값이 반드시 더 커 보여야 한다.**
+ *
+ * 예전에는 이상치가 다른 주를 납작하게 만드는 것을 피하려고 **두 번째로 큰 값**을
+ * 기준으로 삼고 넘치는 막대는 잘라서 그렸다. 그 결과 3번 한 주와 159번 한 주의
+ * 막대가 **똑같은 높이**가 됐다(둘 다 상한에 걸린다). 잘렸다는 표시도 없으니
+ * 읽는 사람은 두 주가 같았다고 이해한다 — 리듬을 보라고 만든 그림이 리듬을 반대로
+ * 알려준 셈이고, PRD §2.4가 경계하는 "수치가 사실과 다르게 읽히는" 경우다.
+ *
+ * 기준을 실제 최댓값으로 되돌리면 순서는 항상 맞다. 대신 작은 값이 사라지지
+ * 않도록 0이 아닌 주에 최소 높이를 보장한다 — "했는데 안 한 것처럼" 보이는 것도
+ * 같은 종류의 거짓말이기 때문이다.
+ *
+ * 0인 주는 이 함수를 쓰지 않는다. 채워진 막대를 두면 "조금 했다"로 읽혀서 화면에서
+ * 점선으로 비워 둔다.
+ */
+export function weeklyBarHeightPx(
+  count: number,
+  maxCount: number,
+  maxHeightPx: number,
+  minHeightPx = 6,
+): number {
+  if (count <= 0) return 0;
+  const scale = Math.max(1, maxCount);
+  const raw = (count / scale) * maxHeightPx;
+  return Math.round(Math.min(maxHeightPx, Math.max(minHeightPx, raw)));
+}

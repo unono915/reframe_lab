@@ -4,6 +4,7 @@ import type { CoachInteraction, Stage } from "@/domain/types";
 import { hasMinimalUserInput } from "@/domain/training/requirements";
 import { buildCoachContext } from "@/lib/ai/context";
 import { getFallbackQuestion } from "@/lib/ai/fallback";
+import { isUnretryableAiError } from "@/lib/ai/errors";
 import { runCoachGuardrails } from "@/lib/ai/guardrails";
 import type { CoachOutput } from "@/lib/ai/provider";
 import { getActiveCoachProvider } from "@/lib/ai/providers";
@@ -35,7 +36,10 @@ async function getValidatedCoachOutput(
     let raw: CoachOutput | undefined;
     try {
       raw = await provider.getCoachResponse(context);
-    } catch {
+    } catch (error) {
+      // 타임아웃은 다시 걸어도 같은 시간을 또 쓸 뿐이다 — 규칙 기반 fallback 질문으로
+      // 바로 넘어가는 편이 사용자에게 훨씬 낫다(lib/ai/errors.ts).
+      if (isUnretryableAiError(error)) break;
       continue;
     }
     const parsed = coachOutputSchema.safeParse(raw);

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import type { AIFeedback } from "@/domain/types";
 import { hasMinimalUserInput } from "@/domain/training/requirements";
+import { isUnretryableAiError } from "@/lib/ai/errors";
 import { runFeedbackGuardrails } from "@/lib/ai/guardrails";
 import type { FeedbackOutput } from "@/lib/ai/provider";
 import { getActiveCoachProvider } from "@/lib/ai/providers";
@@ -71,7 +72,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       let raw: FeedbackOutput | undefined;
       try {
         raw = await provider.getFeedback({ definitionText: latest.text, supportingText });
-      } catch {
+      } catch (error) {
+        // 타임아웃은 다시 걸어도 같은 시간을 또 쓸 뿐이다 — 사용자를 두 배로 기다리게
+        // 하지 않고 바로 자기 점검 경로로 넘긴다(lib/ai/errors.ts).
+        if (isUnretryableAiError(error)) break;
         continue;
       }
       const parsedOutput = feedbackOutputSchema.safeParse(raw);

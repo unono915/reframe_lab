@@ -6,6 +6,7 @@ import type {
   FeedbackOutput,
   FeedbackRequestContext,
 } from "../provider";
+import { AiTimeoutError } from "../errors";
 
 /**
  * Upstage Solar Provider Adapter (§14-D 결정: solar-pro4). `response_format:
@@ -172,6 +173,13 @@ async function callUpstageChat(
       throw new Error("Upstage 응답에 content가 없습니다.");
     }
     return JSON.parse(content);
+  } catch (error) {
+    // AbortController가 끊은 요청은 DOMException("AbortError")로 올라온다. 호출자가
+    // "재시도해도 소용없는 실패"로 구분할 수 있도록 전용 오류로 바꿔 던진다.
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new AiTimeoutError(REQUEST_TIMEOUT_MS);
+    }
+    throw error;
   } finally {
     clearTimeout(timeout);
   }

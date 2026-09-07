@@ -1,5 +1,11 @@
 import { expect, type Page, test } from "@playwright/test";
 import { resetActiveSession } from "./helpers/cleanup";
+import {
+  completeSelfAssessment,
+  DEFAULT_CONTENT,
+  fillStagesUntilFeedback,
+  finishSession,
+} from "./helpers/training-flow";
 
 /**
  * Phase 5 완료 조건: History·Growth·Revisit·삭제가 실제로 동작하는지 확인한다.
@@ -17,72 +23,15 @@ test.beforeEach(async ({ request }) => {
   await resetActiveSession(request);
 });
 
-async function settle(page: Page) {
-  await page.waitForTimeout(200);
-}
-
+/**
+ * 관찰 문장만 바꿔가며 한 세션을 자기 점검 경로로 완주시킨다. 단계 조작 자체는
+ * `helpers/training-flow.ts`가 갖는다 — 화면이 바뀌면 그 한 곳만 고치면 된다.
+ */
 async function completeSessionViaSelfCheck(page: Page, observationText: string) {
   await page.goto("/training/new");
-  await expect(page.getByText("1 / 7 관찰")).toBeVisible();
-  await settle(page);
-  await page.getByLabel("관찰한 장면").fill(observationText);
-  await page.getByRole("button", { name: "다음 질문으로" }).click();
-
-  await expect(page.getByText("2 / 7 구분")).toBeVisible();
-  await settle(page);
-  await page.getByLabel("추가할 항목").fill("확인된 사실 하나");
-  await page.getByRole("button", { name: "항목 추가하기" }).click();
-  await page.getByRole("button", { name: "다음 질문으로" }).click();
-
-  await expect(page.getByText("3 / 7 질문")).toBeVisible();
-  await settle(page);
-  const questionField = page.getByLabel("새 질문");
-  for (const q of ["질문 1?", "질문 2?", "질문 3?"]) {
-    await questionField.fill(q);
-    await page.getByRole("button", { name: "질문 추가하기" }).click();
-  }
-  await page.getByRole("button", { name: "핵심 질문으로 고르기" }).first().click();
-  await page.getByLabel("이 질문을 고른 이유").fill("가장 근본적이라서");
-  await page.getByRole("button", { name: "핵심 질문으로 선택" }).click();
-  await page.getByRole("button", { name: "다음 질문으로" }).click();
-
-  await expect(page.getByText("4 / 7 탐색")).toBeVisible();
-  await settle(page);
-  await page.getByLabel(/가장 직접적인 영향을 받는 사람/).fill("나");
-  await page.getByLabel(/어떤 상황·맥락/).fill("일상");
-  await page.getByLabel(/무엇이 어렵거나 달라졌나요/).fill("불편함이 생겼다");
-  await page.getByLabel(/아직 확실히 모르는 부분/).fill("모르겠다");
-  await page.getByRole("button", { name: "다음 질문으로" }).click();
-
-  await expect(page.getByText("5 / 7 재정의")).toBeVisible();
-  await settle(page);
-  const reframeField = page.getByLabel("대안 문제 프레임");
-  await reframeField.fill("대안 프레임 1");
-  await page.getByRole("button", { name: "프레임 추가하기" }).click();
-  await reframeField.fill("대안 프레임 2");
-  await page.getByRole("button", { name: "프레임 추가하기" }).click();
-  await page.getByRole("button", { name: "다음 질문으로" }).click();
-
-  await expect(page.getByText("6 / 7 정의")).toBeVisible();
-  await settle(page);
-  await page.getByLabel("현재의 문제 정의").fill("현재 가장 타당한 문제 정의");
-  await page.getByRole("button", { name: "이대로 기록하기" }).click();
-
-  await expect(page.getByText("7 / 7 돌아보기")).toBeVisible();
-  await settle(page);
-  for (const label of [
-    "실제 장면이나 확인된 사실에서 출발했나요?",
-    "누가 어떤 상황에서 겪는 문제인지 드러나나요?",
-    "원하는 것과 방해 요소, 결과가 구분되나요?",
-    "확인되지 않은 원인을 단정하지 않았나요?",
-    "지나치게 넓거나 특정 해결책으로 고정되지 않았나요?",
-    "무엇을 더 확인해야 하는지 알 수 있나요?",
-  ]) {
-    await page.getByLabel(label).check();
-  }
-  await page.getByRole("button", { name: "체크리스트 완료로 표시" }).click();
-  await page.getByRole("button", { name: "이대로 완료하기" }).click();
-  await expect(page).toHaveURL(/\/result\//);
+  await fillStagesUntilFeedback(page, { ...DEFAULT_CONTENT, observation: observationText });
+  await completeSelfAssessment(page);
+  await finishSession(page);
 }
 
 test("완료한 기록이 History·Growth에 나타난다", async ({ page }) => {
@@ -94,7 +43,7 @@ test("완료한 기록이 History·Growth에 나타난다", async ({ page }) => 
   await expect(page.getByText("History Growth 검증용 관찰 문장").first()).toBeVisible();
 
   await page.goto("/growth");
-  await expect(page.getByText(/이번 주에 \d+번의 생각을 기록했어요\./)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "생각이 달라진 지점" })).toBeVisible();
 });
 
 test("다시 생각하기(Revisit)는 새 세션을 만들고, 원본을 삭제해도 그 세션은 남는다", async ({

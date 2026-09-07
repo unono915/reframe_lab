@@ -148,6 +148,7 @@ export interface TrainingSessionContextValue {
   enableSoloMode: () => Promise<void>;
   /** 이 세션이 혼자 하기로 선택된 상태인가. */
   isSoloMode: boolean;
+  /** `ok: true`의 question은 항상 공백이 아니다 — 빈 응답은 실패로 변환된다. */
   requestHint: (
     hintLevel: HintLevel,
   ) => Promise<{ ok: true; question: string } | { ok: false; message: string }>;
@@ -485,7 +486,17 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
           return { ok: false, message: body?.message ?? "힌트를 가져오지 못했어요." };
         }
         commit(body.snapshot);
-        return { ok: true, question: body.question ?? "" };
+
+        // 성공 응답인데 질문이 비어 있으면 실패로 돌린다. 서버는 action:"ask"에
+        // 질문이 없는 응답을 Guardrail(checkAskHasQuestion)로 막지만, 그 방어가
+        // 뚫리면 화면에는 오류도 힌트도 없이 아무것도 뜨지 않는다 — 이 프로젝트에서
+        // 세 번 반복된 "힌트 버튼이 침묵한다" 증상이 정확히 그 모양이었다.
+        // 보여줄 것이 없는 성공은 호출자에게 성공이 아니므로 여기서 걸러낸다.
+        const question = body.question?.trim() ?? "";
+        if (!question) {
+          return { ok: false, message: "힌트를 받지 못했어요. 잠시 후 다시 시도해주세요." };
+        }
+        return { ok: true, question };
       }),
     [enqueue, commit],
   );

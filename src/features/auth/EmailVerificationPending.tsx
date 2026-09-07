@@ -101,7 +101,15 @@ function EnvelopeGraphic() {
       aria-hidden="true"
       className="mx-auto text-brand"
     >
-      <rect x="6" y="14" width="52" height="38" rx="8" stroke="currentColor" strokeWidth="3" />
+      <rect
+        x="6"
+        y="14"
+        width="52"
+        height="38"
+        rx="8"
+        stroke="currentColor"
+        strokeWidth="3"
+      />
       <path
         d="M8 18l24 18 24-18"
         stroke="var(--color-brand-strong)"

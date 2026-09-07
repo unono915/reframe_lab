@@ -47,7 +47,9 @@ function summarize(stage: Stage, snapshot: TrainingSessionSnapshot): string {
     }
     case "questioning": {
       const priority = snapshot.questions.find((q) => q.isPriority);
-      return priority ? `핵심 질문: ${priority.text}` : `질문 ${snapshot.questions.length}개`;
+      return priority
+        ? `핵심 질문: ${priority.text}`
+        : `질문 ${snapshot.questions.length}개`;
     }
     case "exploration": {
       const answered = snapshot.stageResponses.filter((r) => r.stage === "exploration");
@@ -55,7 +57,9 @@ function summarize(stage: Stage, snapshot: TrainingSessionSnapshot): string {
     }
     case "reframing": {
       const reframes = snapshot.reframes.filter((r) => r.authorType === "user");
-      return reframes[0] ? `${reframes[0].text}${reframes.length > 1 ? ` 외 ${reframes.length - 1}개` : ""}` : "(작성 안 됨)";
+      return reframes[0]
+        ? `${reframes[0].text}${reframes.length > 1 ? ` 외 ${reframes.length - 1}개` : ""}`
+        : "(작성 안 됨)";
     }
     case "definition": {
       const latest = [...snapshot.problemDefinitionVersions].sort(

@@ -191,7 +191,11 @@ const INTERACTION: CoachInteraction = {
 
 describe("supabase mappers — 도메인 ↔ 행 왕복", () => {
   it.each([
-    ["session", SESSION, (v: TrainingSession) => sessionRowToDomain(sessionDomainToRow(v) as never)],
+    [
+      "session",
+      SESSION,
+      (v: TrainingSession) => sessionRowToDomain(sessionDomainToRow(v) as never),
+    ],
     [
       "observation",
       OBSERVATION,
@@ -206,20 +210,31 @@ describe("supabase mappers — 도메인 ↔ 행 왕복", () => {
     [
       "stageResponse",
       STAGE_RESPONSE,
-      (v: StageResponse) => stageResponseRowToDomain(stageResponseDomainToRow(v) as never),
+      (v: StageResponse) =>
+        stageResponseRowToDomain(stageResponseDomainToRow(v) as never),
     ],
-    ["question", QUESTION, (v: Question) => questionRowToDomain(questionDomainToRow(v) as never)],
+    [
+      "question",
+      QUESTION,
+      (v: Question) => questionRowToDomain(questionDomainToRow(v) as never),
+    ],
     [
       "perspective",
       PERSPECTIVE,
       (v: Perspective) => perspectiveRowToDomain(perspectiveDomainToRow(v) as never),
     ],
-    ["reframe", REFRAME, (v: Reframe) => reframeRowToDomain(reframeDomainToRow(v) as never)],
+    [
+      "reframe",
+      REFRAME,
+      (v: Reframe) => reframeRowToDomain(reframeDomainToRow(v) as never),
+    ],
     [
       "problemDefinitionVersion",
       DEFINITION,
       (v: ProblemDefinitionVersion) =>
-        problemDefinitionVersionRowToDomain(problemDefinitionVersionDomainToRow(v) as never),
+        problemDefinitionVersionRowToDomain(
+          problemDefinitionVersionDomainToRow(v) as never,
+        ),
     ],
     [
       "aiFeedback",
@@ -254,12 +269,18 @@ describe("supabase mappers — 도메인 ↔ 행 왕복", () => {
       contextWhen: undefined,
       contextWhere: undefined,
     };
-    expect(observationRowToDomain(observationDomainToRow(bareObservation) as never)).toEqual(
-      bareObservation,
-    );
+    expect(
+      observationRowToDomain(observationDomainToRow(bareObservation) as never),
+    ).toEqual(bareObservation);
 
-    const bareQuestion: Question = { ...QUESTION, lensType: undefined, priorityReason: undefined };
-    expect(questionRowToDomain(questionDomainToRow(bareQuestion) as never)).toEqual(bareQuestion);
+    const bareQuestion: Question = {
+      ...QUESTION,
+      lensType: undefined,
+      priorityReason: undefined,
+    };
+    expect(questionRowToDomain(questionDomainToRow(bareQuestion) as never)).toEqual(
+      bareQuestion,
+    );
   });
 
   it("템플릿 행은 도메인 필드에 하나씩 대응한다", () => {

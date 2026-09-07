@@ -15,7 +15,9 @@ import { expect, test } from "@playwright/test";
  */
 test.use({ storageState: { cookies: [], origins: [] } });
 
-test("미인증 API 요청은 로그인 HTML이 아니라 401 JSON을 돌려준다", async ({ request }) => {
+test("미인증 API 요청은 로그인 HTML이 아니라 401 JSON을 돌려준다", async ({
+  request,
+}) => {
   const response = await request.get("/api/history", { maxRedirects: 0 });
 
   expect(response.status()).toBe(401);

@@ -26,10 +26,7 @@ import type {
 } from "@/domain/training/builders";
 import { canAdvance as computeCanAdvance } from "@/domain/training/state-machine";
 import { STAGE_ORDER } from "@/domain/training/stages";
-import {
-  EXCEPTION_PROMPT_KEYS,
-  isSoloModeSession,
-} from "@/domain/training/requirements";
+import { EXCEPTION_PROMPT_KEYS, isSoloModeSession } from "@/domain/training/requirements";
 import {
   clearSessionDrafts,
   createDebouncedDraftSaver,
@@ -84,7 +81,12 @@ interface State {
 
 type Action =
   | { type: "loading" }
-  | { type: "ready"; snapshot: TrainingSessionSnapshot; template: TrainingTemplate | null; conflictingDrafts: DraftRecord[] }
+  | {
+      type: "ready";
+      snapshot: TrainingSessionSnapshot;
+      template: TrainingTemplate | null;
+      conflictingDrafts: DraftRecord[];
+    }
   | { type: "snapshotUpdated"; snapshot: TrainingSessionSnapshot }
   | { type: "conflictsUpdated"; conflictingDrafts: DraftRecord[] }
   | { type: "error"; message: string };
@@ -92,7 +94,13 @@ type Action =
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case "loading":
-      return { status: "loading", snapshot: null, template: null, errorMessage: null, conflictingDrafts: [] };
+      return {
+        status: "loading",
+        snapshot: null,
+        template: null,
+        errorMessage: null,
+        conflictingDrafts: [],
+      };
     case "ready":
       return {
         status: "ready",
@@ -163,7 +171,9 @@ const TrainingSessionContext = createContext<TrainingSessionContextValue | null>
 export function useTrainingSession(): TrainingSessionContextValue {
   const ctx = useContext(TrainingSessionContext);
   if (!ctx) {
-    throw new Error("useTrainingSession은 TrainingSessionProvider 안에서만 쓸 수 있습니다.");
+    throw new Error(
+      "useTrainingSession은 TrainingSessionProvider 안에서만 쓸 수 있습니다.",
+    );
   }
   return ctx;
 }
@@ -247,7 +257,9 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
   );
 
   const callTransition = useCallback(
-    (endpoint: "advance" | "pause" | "resume" | "abandon"): Promise<{ ok: true } | { ok: false; message: string }> =>
+    (
+      endpoint: "advance" | "pause" | "resume" | "abandon",
+    ): Promise<{ ok: true } | { ok: false; message: string }> =>
       enqueue(async () => {
         const current = snapshotRef.current;
         if (!current) return { ok: false, message: "세션이 아직 준비되지 않았습니다." };
@@ -267,10 +279,14 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
             clientRequestId: crypto.randomUUID(),
           }),
         });
-        const body = await parseJsonSafe<{ snapshot: TrainingSessionSnapshot } & Partial<ApiErrorBody>>(
-          response,
-        );
-        if (!body) return { ok: false, message: "저장하지 못했어요. 작성한 내용은 그대로 있어요." };
+        const body = await parseJsonSafe<
+          { snapshot: TrainingSessionSnapshot } & Partial<ApiErrorBody>
+        >(response);
+        if (!body)
+          return {
+            ok: false,
+            message: "저장하지 못했어요. 작성한 내용은 그대로 있어요.",
+          };
 
         // 실패 응답도 서버가 함께 보내주는 최신 스냅샷으로 갱신한다 — 다른 기기가 먼저
         // 진행시킨 경우 이 기기도 그 최신 상태를 즉시 보게 된다(§7.3 409 규약).
@@ -322,12 +338,16 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "loading" });
       try {
         const activeRes = await fetch("/api/sessions?status=active");
-        const activeBody = await parseJsonSafe<{ snapshot: TrainingSessionSnapshot | null }>(activeRes);
+        const activeBody = await parseJsonSafe<{
+          snapshot: TrainingSessionSnapshot | null;
+        }>(activeRes);
         let snapshot = activeBody?.snapshot ?? null;
 
         if (!snapshot) {
           const timezone = timezoneRef.current;
-          const todayRes = await fetch(`/api/templates/today?timezone=${encodeURIComponent(timezone)}`);
+          const todayRes = await fetch(
+            `/api/templates/today?timezone=${encodeURIComponent(timezone)}`,
+          );
           const todayBody = await parseJsonSafe<{ template: TrainingTemplate }>(todayRes);
           if (!todayBody) throw new UserFacingError("오늘의 렌즈를 불러오지 못했어요.");
 
@@ -341,9 +361,13 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
               clientRequestId: crypto.randomUUID(),
             }),
           });
-          const createBody = await parseJsonSafe<{ snapshot: TrainingSessionSnapshot }>(createRes);
+          const createBody = await parseJsonSafe<{ snapshot: TrainingSessionSnapshot }>(
+            createRes,
+          );
           if (!createRes.ok || !createBody)
-            throw new UserFacingError("훈련을 시작하지 못했어요. 잠시 후 다시 시도해주세요.");
+            throw new UserFacingError(
+              "훈련을 시작하지 못했어요. 잠시 후 다시 시도해주세요.",
+            );
           snapshot = createBody.snapshot;
         } else if (snapshot.session.status === "paused") {
           // /training 진입 자체가 "이어서 하기" 행동이다.
@@ -355,7 +379,9 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
               clientRequestId: crypto.randomUUID(),
             }),
           });
-          const resumeBody = await parseJsonSafe<{ snapshot: TrainingSessionSnapshot }>(resumeRes);
+          const resumeBody = await parseJsonSafe<{ snapshot: TrainingSessionSnapshot }>(
+            resumeRes,
+          );
           if (resumeBody) snapshot = resumeBody.snapshot;
         }
 
@@ -413,7 +439,11 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
   const loadDraft = useCallback(async (promptKey: string) => {
     const current = snapshotRef.current;
     if (!current) return undefined;
-    const draft = await getDraft(current.session.id, current.session.currentStage, promptKey);
+    const draft = await getDraft(
+      current.session.id,
+      current.session.currentStage,
+      promptKey,
+    );
     return draft?.content;
   }, []);
 
@@ -459,7 +489,10 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
     async (promptKey: string, content: string) => {
       await callMutate({
         action: "addExplorationResponse",
-        args: { promptKey: promptKey as z.infer<typeof explorationPromptKeySchema>, content },
+        args: {
+          promptKey: promptKey as z.infer<typeof explorationPromptKeySchema>,
+          content,
+        },
       });
     },
     [callMutate],
@@ -520,7 +553,10 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
           body: JSON.stringify({ hintLevel, clientRequestId: crypto.randomUUID() }),
         });
         const body = await parseJsonSafe<
-          { question: string | null; snapshot: TrainingSessionSnapshot } & Partial<ApiErrorBody>
+          {
+            question: string | null;
+            snapshot: TrainingSessionSnapshot;
+          } & Partial<ApiErrorBody>
         >(response);
         if (!response.ok || !body) {
           return {
@@ -564,7 +600,10 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
         if (!response.ok || !body || !("feedback" in body)) {
           return {
             ok: false,
-            message: body && "message" in body ? body.message : "AI 피드백을 지금은 만들 수 없어요.",
+            message:
+              body && "message" in body
+                ? body.message
+                : "AI 피드백을 지금은 만들 수 없어요.",
           };
         }
         commit(body.snapshot);
@@ -603,5 +642,9 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
     requestFeedback,
   };
 
-  return <TrainingSessionContext.Provider value={value}>{children}</TrainingSessionContext.Provider>;
+  return (
+    <TrainingSessionContext.Provider value={value}>
+      {children}
+    </TrainingSessionContext.Provider>
+  );
 }

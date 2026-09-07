@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { buildCoachContext } from "@/lib/ai/context";
 import { runCoachGuardrails } from "@/lib/ai/guardrails";
-import { PROMPT_INJECTION_USER_TEXT, VALID_OUTPUT } from "../../../fixtures/ai/coach-outputs";
+import {
+  PROMPT_INJECTION_USER_TEXT,
+  VALID_OUTPUT,
+} from "../../../fixtures/ai/coach-outputs";
 import {
   makeCoachInteraction,
   makeObservation,
@@ -82,7 +85,9 @@ describe("runCoachGuardrails — 프롬프트 주입 문구는 특별 취급되�
  */
 describe("buildCoachContext — 단계별로 그 단계의 사용자 입력만 담는다", () => {
   it("observation: 관찰 원문", () => {
-    const snapshot = makeSnapshot({ observation: makeObservation({ rawText: "관찰한 장면" }) });
+    const snapshot = makeSnapshot({
+      observation: makeObservation({ rawText: "관찰한 장면" }),
+    });
     expect(buildCoachContext("observation", snapshot, 0).userText).toBe("관찰한 장면");
   });
 
@@ -95,7 +100,11 @@ describe("buildCoachContext — 단계별로 그 단계의 사용자 입력만 �
       observationItems: [
         makeObservationItem({ text: "확인된 사실", type: "fact", userConfirmed: true }),
         // AI가 제안했지만 사용자가 아직 확인하지 않은 항목 — 사용자 입력이 아니다.
-        makeObservationItem({ text: "미확인 제안", type: "interpretation", userConfirmed: false }),
+        makeObservationItem({
+          text: "미확인 제안",
+          type: "interpretation",
+          userConfirmed: false,
+        }),
       ],
     });
     const { userText } = buildCoachContext("separation", snapshot, 0);
@@ -118,10 +127,25 @@ describe("buildCoachContext — 단계별로 그 단계의 사용자 입력만 �
   it("exploration: 확정된 응답만 — 작성 중 초안은 보내지 않는다", () => {
     const snapshot = makeSnapshot({
       stageResponses: [
-        makeStageResponse({ stage: "exploration", promptKey: "context", content: "확정 답변", isDraft: false }),
-        makeStageResponse({ stage: "exploration", promptKey: "impact", content: "쓰다 만 초안", isDraft: true }),
+        makeStageResponse({
+          stage: "exploration",
+          promptKey: "context",
+          content: "확정 답변",
+          isDraft: false,
+        }),
+        makeStageResponse({
+          stage: "exploration",
+          promptKey: "impact",
+          content: "쓰다 만 초안",
+          isDraft: true,
+        }),
         // 다른 단계의 응답이 섞이면 안 된다.
-        makeStageResponse({ stage: "feedback", promptKey: "other", content: "다른 단계 응답", isDraft: false }),
+        makeStageResponse({
+          stage: "feedback",
+          promptKey: "other",
+          content: "다른 단계 응답",
+          isDraft: false,
+        }),
       ],
     });
     const { userText } = buildCoachContext("exploration", snapshot, 0);
@@ -162,7 +186,11 @@ describe("buildCoachContext — 단계별로 그 단계의 사용자 입력만 �
 });
 
 describe("buildCoachContext — 반복 질문 검사용 최근 질문", () => {
-  function coachAsked(stage: Parameters<typeof buildCoachContext>[0], question: string, isStale = false) {
+  function coachAsked(
+    stage: Parameters<typeof buildCoachContext>[0],
+    question: string,
+    isStale = false,
+  ) {
     return makeCoachInteraction({ stage, isStale, validatedOutput: { question } });
   }
 
@@ -202,10 +230,15 @@ describe("buildCoachContext — 반복 질문 검사용 최근 질문", () => {
   it("질문이 비어 있던 상호작용은 걸러낸다", () => {
     const snapshot = makeSnapshot({
       coachInteractions: [
-        makeCoachInteraction({ stage: "questioning", validatedOutput: { question: null } }),
+        makeCoachInteraction({
+          stage: "questioning",
+          validatedOutput: { question: null },
+        }),
         coachAsked("questioning", "실제 질문"),
       ],
     });
-    expect(buildCoachContext("questioning", snapshot, 0).recentQuestions).toEqual(["실제 질문"]);
+    expect(buildCoachContext("questioning", snapshot, 0).recentQuestions).toEqual([
+      "실제 질문",
+    ]);
   });
 });

@@ -40,7 +40,8 @@ export async function recordIdempotentResponse(
     user_id: userId,
     client_request_id: clientRequestId,
     response_status: status,
-    response_body: body as Database["public"]["Tables"]["idempotency_keys"]["Insert"]["response_body"],
+    response_body:
+      body as Database["public"]["Tables"]["idempotency_keys"]["Insert"]["response_body"],
   });
   if (error) throw error;
 }

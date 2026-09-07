@@ -48,7 +48,10 @@ for (const path of ["/auth/login", "/api/templates"]) {
 
     // connect-src는 우리 서버와 Supabase만 열어야 한다. `https:`처럼 넓게 열면
     // 토큰을 아무 데나 보내는 코드가 주입돼도 막지 못한다 — 그 자리를 지킨다.
-    const connectSrc = csp.split(";").map((d) => d.trim()).find((d) => d.startsWith("connect-src"));
+    const connectSrc = csp
+      .split(";")
+      .map((d) => d.trim())
+      .find((d) => d.startsWith("connect-src"));
     expect(connectSrc, "connect-src 지시자가 없다").toBeTruthy();
     expect(connectSrc).not.toMatch(/(^|\s)(\*|https:|http:)(\s|$)/);
     expect(connectSrc).toContain(".supabase.co");

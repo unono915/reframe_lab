@@ -29,7 +29,10 @@ test.beforeEach(async ({ request }) => {
  */
 async function completeSessionViaSelfCheck(page: Page, observationText: string) {
   await page.goto("/training/new");
-  await fillStagesUntilFeedback(page, { ...DEFAULT_CONTENT, observation: observationText });
+  await fillStagesUntilFeedback(page, {
+    ...DEFAULT_CONTENT,
+    observation: observationText,
+  });
   await completeSelfAssessment(page);
   await finishSession(page);
 }

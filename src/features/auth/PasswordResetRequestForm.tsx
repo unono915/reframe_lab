@@ -44,7 +44,10 @@ export function PasswordResetRequestForm() {
       }
     >
       {sent ? (
-        <p role="status" className="rounded-control bg-brand-soft px-4 py-3 text-body text-ink">
+        <p
+          role="status"
+          className="rounded-control bg-brand-soft px-4 py-3 text-body text-ink"
+        >
           입력하신 이메일로 재설정 링크를 보냈어요. 메일함을 확인해주세요.
         </p>
       ) : (

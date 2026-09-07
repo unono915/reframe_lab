@@ -127,7 +127,13 @@ describe("sessionStatusLabel", () => {
    */
   it("어떤 상태도 사용자를 실패로 규정하지 않는다", () => {
     const blaming = ["실패", "포기", "미완", "중도"];
-    for (const status of ["completed", "paused", "abandoned", "observation", "feedback"] as const) {
+    for (const status of [
+      "completed",
+      "paused",
+      "abandoned",
+      "observation",
+      "feedback",
+    ] as const) {
       const label = sessionStatusLabel(status);
       for (const word of blaming) {
         expect(label, `${status} → "${label}"`).not.toContain(word);

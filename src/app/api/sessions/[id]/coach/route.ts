@@ -11,7 +11,11 @@ import { getActiveCoachProvider } from "@/lib/ai/providers";
 import { coachOutputSchema, type CoachOutputSchema } from "@/lib/schemas/coach-output";
 import { checkRateLimit, SESSION_AI_CALL_CAP } from "@/lib/rate-limit";
 import { apiError } from "@/lib/errors";
-import { createRouteContext, loadOwnedSnapshot, withIdempotency } from "../../../_lib/route-context";
+import {
+  createRouteContext,
+  loadOwnedSnapshot,
+  withIdempotency,
+} from "../../../_lib/route-context";
 
 const requestSchema = z.object({
   hintLevel: z.union([z.literal(0), z.literal(1), z.literal(2)]),
@@ -85,7 +89,10 @@ async function getValidatedCoachOutput(
   };
 }
 
-export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
   const { id: sessionId } = await params;
   const ctx = await createRouteContext();
   if (!ctx.ok) return ctx.response;
@@ -93,7 +100,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const json = await request.json().catch(() => null);
   const parsed = requestSchema.safeParse(json);
-  if (!parsed.success) return apiError("validation_error", parsed.error.issues[0]?.message);
+  if (!parsed.success)
+    return apiError("validation_error", parsed.error.issues[0]?.message);
   const { hintLevel, clientRequestId } = parsed.data;
 
   return withIdempotency(supabase, userId, clientRequestId, async () => {

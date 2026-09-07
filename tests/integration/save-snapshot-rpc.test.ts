@@ -163,7 +163,8 @@ describe.skipIf(!dbUrl)("save_training_session_snapshot RPC", () => {
     `;
     expect(pdvRows[0]?.based_on_feedback_id).toBe(feedbackId);
 
-    const feedbacks = await sql`select id from public.ai_feedbacks where session_id = ${sessionId}`;
+    const feedbacks =
+      await sql`select id from public.ai_feedbacks where session_id = ${sessionId}`;
     expect(feedbacks).toHaveLength(1);
   });
 
@@ -180,7 +181,8 @@ describe.skipIf(!dbUrl)("save_training_session_snapshot RPC", () => {
       observationItemIds: [keptItem],
     });
 
-    const questions = await sql`select id from public.questions where session_id = ${sessionId}`;
+    const questions =
+      await sql`select id from public.questions where session_id = ${sessionId}`;
     expect(questions.map((r) => r.id)).toEqual([keptQuestion]);
 
     const items = await sql`

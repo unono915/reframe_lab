@@ -48,7 +48,10 @@ export function LoginForm({
       title="로그인"
       footer={
         <Stack gap={2}>
-          <Link href="/auth/reset-password" className="text-label font-bold text-brand-strong">
+          <Link
+            href="/auth/reset-password"
+            className="text-label font-bold text-brand-strong"
+          >
             비밀번호를 잊으셨나요?
           </Link>
           <p className="text-label text-text-secondary">
@@ -66,7 +69,11 @@ export function LoginForm({
           <Field id="login-email" label="이메일" errorText={errors.email?.message}>
             <Input type="email" autoComplete="email" {...register("email")} />
           </Field>
-          <Field id="login-password" label="비밀번호" errorText={errors.password?.message}>
+          <Field
+            id="login-password"
+            label="비밀번호"
+            errorText={errors.password?.message}
+          >
             <PasswordInput autoComplete="current-password" {...register("password")} />
           </Field>
           <Button type="submit" variant="primary" fullWidth disabled={isSubmitting}>

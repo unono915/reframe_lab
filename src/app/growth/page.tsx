@@ -90,10 +90,7 @@ export default function GrowthPage() {
   // 기준은 실제 최댓값이다. 두 번째로 큰 값을 기준으로 삼고 넘치는 막대를 자르던
   // 방식은, 3번 한 주와 159번 한 주를 **같은 높이**로 그렸다(둘 다 상한에 걸린다).
   // 자세한 근거는 `weeklyBarHeightPx` 주석 참고.
-  const maxWeekCount = Math.max(
-    1,
-    ...metrics.recentWeeks.map((w) => w.completedCount),
-  );
+  const maxWeekCount = Math.max(1, ...metrics.recentWeeks.map((w) => w.completedCount));
 
   return (
     <main className="pt-safe pb-safe mx-auto flex min-h-dvh max-w-[640px] flex-col gap-8 px-5 py-10">
@@ -107,8 +104,8 @@ export default function GrowthPage() {
       {metrics.totalCompleted < MIN_SESSIONS_FOR_RHYTHM ? (
         <Card variant="neutral">
           <p className="text-body text-ink">
-            기록이 몇 번 쌓이면 생각의 변화를 볼 수 있어요. 지금까지 {metrics.totalCompleted}번
-            완료했어요.
+            기록이 몇 번 쌓이면 생각의 변화를 볼 수 있어요. 지금까지{" "}
+            {metrics.totalCompleted}번 완료했어요.
           </p>
         </Card>
       ) : (
@@ -167,7 +164,9 @@ function QualitySection({ metrics }: { metrics: GrowthMetrics }) {
                   정의에 드러나는 것이 늘었는지
                 </p>
                 <DotTrend points={metrics.coverageTrend} max={1} />
-                <p className="text-body text-ink">{coverageSentence(metrics.coverageShift)}</p>
+                <p className="text-body text-ink">
+                  {coverageSentence(metrics.coverageShift)}
+                </p>
               </Stack>
             </Card>
           )}
@@ -192,8 +191,12 @@ function QualitySection({ metrics }: { metrics: GrowthMetrics }) {
           {metrics.strongHintShift && (
             <Card variant="paper">
               <Stack gap={2}>
-                <p className="text-label font-bold text-text-secondary">힌트에 기대는 정도</p>
-                <p className="text-body text-ink">{hintSentence(metrics.strongHintShift)}</p>
+                <p className="text-label font-bold text-text-secondary">
+                  힌트에 기대는 정도
+                </p>
+                <p className="text-body text-ink">
+                  {hintSentence(metrics.strongHintShift)}
+                </p>
               </Stack>
             </Card>
           )}
@@ -203,7 +206,8 @@ function QualitySection({ metrics }: { metrics: GrowthMetrics }) {
               <Stack gap={2}>
                 <p className="text-label font-bold text-text-secondary">혼자 해낸 기록</p>
                 <p className="text-body text-ink">
-                  AI 도움 없이 끝까지 간 기록이 {metrics.completedWithoutAiCount}번 있어요.
+                  AI 도움 없이 끝까지 간 기록이 {metrics.completedWithoutAiCount}번
+                  있어요.
                 </p>
                 <p className="text-caption text-text-tertiary">
                   이 앱의 목표는 AI가 있을 때 잘 쓰는 것이 아니라, 없을 때도 스스로 보는
@@ -276,8 +280,8 @@ function RhythmSection({
             ))}
           </Stack>
           <p className="text-caption text-text-secondary">
-            이번 주에 {metrics.completedThisWeek}번, 지금까지 모두 {metrics.totalCompleted}번
-            기록했어요.
+            이번 주에 {metrics.completedThisWeek}번, 지금까지 모두{" "}
+            {metrics.totalCompleted}번 기록했어요.
           </p>
         </Stack>
       </Card>

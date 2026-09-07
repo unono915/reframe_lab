@@ -147,14 +147,20 @@ export function createSupabaseSessionRepository(
     return {
       session: sessionRowToDomain(sessionRow),
       observation: observationRow ? observationRowToDomain(observationRow) : null,
-      observationItems: (observationItemsResult.data ?? []).map(observationItemRowToDomain),
+      observationItems: (observationItemsResult.data ?? []).map(
+        observationItemRowToDomain,
+      ),
       stageResponses: (stageResponsesResult.data ?? []).map(stageResponseRowToDomain),
       questions: (questionsResult.data ?? []).map(questionRowToDomain),
       perspectives: (perspectivesResult.data ?? []).map(perspectiveRowToDomain),
       reframes: (reframesResult.data ?? []).map(reframeRowToDomain),
-      problemDefinitionVersions: (pdvResult.data ?? []).map(problemDefinitionVersionRowToDomain),
+      problemDefinitionVersions: (pdvResult.data ?? []).map(
+        problemDefinitionVersionRowToDomain,
+      ),
       aiFeedbacks: (aiFeedbacksResult.data ?? []).map(aiFeedbackRowToDomain),
-      coachInteractions: (coachInteractionsResult.data ?? []).map(coachInteractionRowToDomain),
+      coachInteractions: (coachInteractionsResult.data ?? []).map(
+        coachInteractionRowToDomain,
+      ),
     };
   }
 
@@ -265,7 +271,10 @@ export function createSupabaseSessionRepository(
     },
 
     async deleteSession(sessionId: string): Promise<void> {
-      const { error } = await client.from("training_sessions").delete().eq("id", sessionId);
+      const { error } = await client
+        .from("training_sessions")
+        .delete()
+        .eq("id", sessionId);
       if (error) throw error;
     },
 
@@ -280,7 +289,9 @@ export function createSupabaseSessionRepository(
     ): Promise<SessionSummary[]> {
       const { data: sessionRows, error } = await client
         .from("training_sessions")
-        .select("id, training_date, status, template_id, origin_session_id, ai_call_count")
+        .select(
+          "id, training_date, status, template_id, origin_session_id, ai_call_count",
+        )
         .eq("user_id", userId)
         .order("started_at", { ascending: false })
         .range(offset, offset + limit - 1);
@@ -308,9 +319,14 @@ export function createSupabaseSessionRepository(
         // 세션 수와 무관하게 쿼리 수는 그대로 상수로 유지된다.
         client
           .from("ai_feedbacks")
-          .select("session_id, problem_definition_version_id, dimensions, is_stale, created_at")
+          .select(
+            "session_id, problem_definition_version_id, dimensions, is_stale, created_at",
+          )
           .in("session_id", ids),
-        client.from("coach_interactions").select("session_id, hint_level").in("session_id", ids),
+        client
+          .from("coach_interactions")
+          .select("session_id, hint_level")
+          .in("session_id", ids),
         // 자기 점검(feedback 단계)과 "혼자 해보기" 표식을 한 번에 가져온다.
         client
           .from("stage_responses")
@@ -357,7 +373,10 @@ export function createSupabaseSessionRepository(
       const feedbackCreatedAt = new Map<string, string>();
       for (const row of feedbacksResult.data ?? []) {
         if (row.is_stale) continue;
-        if (row.problem_definition_version_id !== latestVersionIdBySession.get(row.session_id)) {
+        if (
+          row.problem_definition_version_id !==
+          latestVersionIdBySession.get(row.session_id)
+        ) {
           continue;
         }
         const seenAt = feedbackCreatedAt.get(row.session_id);
@@ -391,7 +410,10 @@ export function createSupabaseSessionRepository(
       const userReframeCounts = new Map<string, number>();
       for (const row of reframesResult.data ?? []) {
         if (row.author_type !== "user") continue;
-        userReframeCounts.set(row.session_id, (userReframeCounts.get(row.session_id) ?? 0) + 1);
+        userReframeCounts.set(
+          row.session_id,
+          (userReframeCounts.get(row.session_id) ?? 0) + 1,
+        );
       }
 
       return sessionRows.map((row) => ({

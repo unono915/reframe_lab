@@ -4,7 +4,10 @@
  */
 export function AuthErrorBanner({ message }: { message: string }) {
   return (
-    <p role="alert" className="rounded-control bg-danger-bg px-4 py-3 text-label font-bold text-danger">
+    <p
+      role="alert"
+      className="rounded-control bg-danger-bg px-4 py-3 text-label font-bold text-danger"
+    >
       {message}
     </p>
   );

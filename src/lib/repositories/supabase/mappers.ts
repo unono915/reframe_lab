@@ -328,7 +328,8 @@ export function aiFeedbackDomainToRow(
     id: feedback.id,
     session_id: feedback.sessionId,
     problem_definition_version_id: feedback.problemDefinitionVersionId,
-    dimensions: feedback.dimensions as unknown as Database["public"]["Tables"]["ai_feedbacks"]["Insert"]["dimensions"],
+    dimensions:
+      feedback.dimensions as unknown as Database["public"]["Tables"]["ai_feedbacks"]["Insert"]["dimensions"],
     strength: feedback.strength,
     improvement_focus: feedback.improvementFocus,
     unverified_assumption: feedback.unverifiedAssumption,
@@ -369,7 +370,8 @@ export function coachInteractionDomainToRow(
     id: interaction.id,
     session_id: interaction.sessionId,
     stage: interaction.stage,
-    validated_output: interaction.validatedOutput as Database["public"]["Tables"]["coach_interactions"]["Insert"]["validated_output"],
+    validated_output:
+      interaction.validatedOutput as Database["public"]["Tables"]["coach_interactions"]["Insert"]["validated_output"],
     action: interaction.action,
     hint_level: interaction.hintLevel,
     provider: interaction.provider,

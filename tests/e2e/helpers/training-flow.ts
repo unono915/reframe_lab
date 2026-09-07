@@ -110,7 +110,9 @@ export async function fillStagesUntilFeedback(
 
   await expect(page.getByText("4 / 7 탐색")).toBeVisible();
   await settle(page);
-  await page.getByLabel(/가장 직접적인 영향을 받는 사람/).fill(content.exploration.affected);
+  await page
+    .getByLabel(/가장 직접적인 영향을 받는 사람/)
+    .fill(content.exploration.affected);
   await page.getByLabel(/어떤 상황·맥락/).fill(content.exploration.context);
   await page.getByLabel(/무엇이 어렵거나 달라졌나요/).fill(content.exploration.impact);
   await page.getByLabel(/아직 확실히 모르는 부분/).fill(content.exploration.unknown);

@@ -344,7 +344,10 @@ describe("hasMinimalUserInput — User-first gate", () => {
       ),
     ).toBe(false);
     expect(
-      hasMinimalUserInput("observation", makeSnapshot({ observation: makeObservation() })),
+      hasMinimalUserInput(
+        "observation",
+        makeSnapshot({ observation: makeObservation() }),
+      ),
     ).toBe(true);
   });
 
@@ -353,7 +356,9 @@ describe("hasMinimalUserInput — User-first gate", () => {
     expect(
       hasMinimalUserInput(
         "separation",
-        makeSnapshot({ observationItems: [makeObservationItem({ userConfirmed: false })] }),
+        makeSnapshot({
+          observationItems: [makeObservationItem({ userConfirmed: false })],
+        }),
       ),
     ).toBe(true);
   });
@@ -380,18 +385,24 @@ describe("hasMinimalUserInput — User-first gate", () => {
       ),
     ).toBe(false);
     expect(
-      hasMinimalUserInput("exploration", makeSnapshot({ stageResponses: [makeStageResponse()] })),
+      hasMinimalUserInput(
+        "exploration",
+        makeSnapshot({ stageResponses: [makeStageResponse()] }),
+      ),
     ).toBe(true);
   });
 
   it("reframing requires at least one user perspective or reframe", () => {
     expect(hasMinimalUserInput("reframing", makeSnapshot())).toBe(false);
     expect(
-      hasMinimalUserInput("reframing", makeSnapshot({ perspectives: [makePerspective()] })),
+      hasMinimalUserInput(
+        "reframing",
+        makeSnapshot({ perspectives: [makePerspective()] }),
+      ),
     ).toBe(true);
-    expect(hasMinimalUserInput("reframing", makeSnapshot({ reframes: [makeReframe()] }))).toBe(
-      true,
-    );
+    expect(
+      hasMinimalUserInput("reframing", makeSnapshot({ reframes: [makeReframe()] })),
+    ).toBe(true);
   });
 
   it("definition and feedback both require a user-authored v1", () => {

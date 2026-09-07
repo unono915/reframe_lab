@@ -22,7 +22,9 @@ export function AuthShell({ title, description, children, footer }: AuthShellPro
         <Card variant="paper" className="flex flex-col gap-6">
           <div className="flex flex-col gap-2 text-center">
             <h1 className="text-heading-2 font-bold text-ink">{title}</h1>
-            {description && <p className="text-body text-text-secondary">{description}</p>}
+            {description && (
+              <p className="text-body text-text-secondary">{description}</p>
+            )}
           </div>
           {children}
         </Card>

@@ -147,8 +147,10 @@ export function runCoachGuardrails(
   }
   if (!checkNoGhostwriting(output, context.currentStage)) violations.push("ghostwriting");
   if (!checkNoSolution(output.coachMessage)) violations.push("solution_suggested");
-  if (!checkValidNextStage(output, context.currentStage)) violations.push("invalid_next_stage");
-  if (!checkNotRepeated(output, context.recentQuestions)) violations.push("repeated_question");
+  if (!checkValidNextStage(output, context.currentStage))
+    violations.push("invalid_next_stage");
+  if (!checkNotRepeated(output, context.recentQuestions))
+    violations.push("repeated_question");
 
   if (violations.length > 0) {
     return { ok: false, output, violations };

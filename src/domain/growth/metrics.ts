@@ -96,7 +96,8 @@ export function computeGrowthMetrics(
     const weekStart = addDays(thisWeekStart, -7 * weeksAgo);
     return {
       weekStart,
-      completedCount: completed.filter((s) => mondayOf(s.trainingDate) === weekStart).length,
+      completedCount: completed.filter((s) => mondayOf(s.trainingDate) === weekStart)
+        .length,
     };
   });
 

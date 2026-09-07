@@ -11,7 +11,9 @@ function LoginPageContent() {
   return (
     <LoginForm
       next={next}
-      initialError={verifyError ? "링크가 만료됐거나 이미 사용됐어요. 다시 로그인해주세요." : null}
+      initialError={
+        verifyError ? "링크가 만료됐거나 이미 사용됐어요. 다시 로그인해주세요." : null
+      }
     />
   );
 }

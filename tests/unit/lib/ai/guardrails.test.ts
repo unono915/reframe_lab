@@ -64,7 +64,12 @@ describe("runCoachGuardrails — 위반 감지", () => {
     // suggest_advance·feedback·fallback·safety는 물어볼 것이 없는 상태가 정상이다.
     for (const action of ["suggest_advance", "feedback", "fallback", "safety"] as const) {
       const result = runCoachGuardrails(
-        { ...VALID_OUTPUT, action, question: null, coachMessage: "다음 단계로 넘어가도 좋아요." },
+        {
+          ...VALID_OUTPUT,
+          action,
+          question: null,
+          coachMessage: "다음 단계로 넘어가도 좋아요.",
+        },
         baseContext,
       );
       expect(result.violations, action).not.toContain("missing_question");
@@ -147,7 +152,10 @@ describe("runCoachGuardrails — 근거 필터링(부분 실패는 통과)", () 
   });
 
   it("evidenceReferences가 원래 비어있으면 위반이 아니다", () => {
-    const result = runCoachGuardrails({ ...VALID_OUTPUT, evidenceReferences: [] }, baseContext);
+    const result = runCoachGuardrails(
+      { ...VALID_OUTPUT, evidenceReferences: [] },
+      baseContext,
+    );
     expect(result.violations).not.toContain("unverified_evidence");
   });
 });
@@ -198,13 +206,26 @@ describe("runFeedbackGuardrails", () => {
   });
 
   it("'점검해보세요'·'검토해보세요'도 해결책 제안이 아니다", () => {
-    expect(runFeedbackGuardrails({ ...validFeedback, nextQuestion: "이 부분을 점검해보세요." }, userText).ok).toBe(true);
-    expect(runFeedbackGuardrails({ ...validFeedback, nextQuestion: "이 가정을 검토해보세요." }, userText).ok).toBe(true);
+    expect(
+      runFeedbackGuardrails(
+        { ...validFeedback, nextQuestion: "이 부분을 점검해보세요." },
+        userText,
+      ).ok,
+    ).toBe(true);
+    expect(
+      runFeedbackGuardrails(
+        { ...validFeedback, nextQuestion: "이 가정을 검토해보세요." },
+        userText,
+      ).ok,
+    ).toBe(true);
   });
 
   it("실제 해결책 제안('이렇게 해보세요')은 여전히 위반으로 잡는다", () => {
     const result = runFeedbackGuardrails(
-      { ...validFeedback, improvementFocus: "다음부터는 회의 전에 미리 물어보는 방식을 도입해보세요." },
+      {
+        ...validFeedback,
+        improvementFocus: "다음부터는 회의 전에 미리 물어보는 방식을 도입해보세요.",
+      },
       userText,
     );
     expect(result.ok).toBe(false);

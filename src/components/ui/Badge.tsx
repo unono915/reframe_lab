@@ -26,7 +26,12 @@ export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
  * DESIGN.md §17.3 Component Variants. 색만으로 구분하지 않는다(§14.2 접근성
  * 체크리스트) — 텍스트 Label이 항상 의미를 전달하고, 색은 보조 신호일 뿐이다.
  */
-export function Badge({ variant = "neutral", className, children, ...props }: BadgeProps) {
+export function Badge({
+  variant = "neutral",
+  className,
+  children,
+  ...props
+}: BadgeProps) {
   return (
     <span
       className={cn(

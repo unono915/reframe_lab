@@ -17,7 +17,11 @@ import { selfAssessmentPromptKey } from "@/domain/training/self-assessment";
 import { applyStaleness, computeStaleArtifacts } from "@/domain/training/staleness";
 import { mutateRequestSchema, type MutateAction } from "@/lib/schemas/mutate-actions";
 import { apiError } from "@/lib/errors";
-import { createRouteContext, loadOwnedSnapshot, withIdempotency } from "../../../_lib/route-context";
+import {
+  createRouteContext,
+  loadOwnedSnapshot,
+  withIdempotency,
+} from "../../../_lib/route-context";
 
 function propagateStalenessIfEditingPastStage(
   current: TrainingSessionSnapshot,
@@ -40,7 +44,11 @@ function applyMutation(
 ): TrainingSessionSnapshot {
   switch (mutation.action) {
     case "submitObservation": {
-      const observation = buildObservation(current.session.id, mutation.args, current.observation);
+      const observation = buildObservation(
+        current.session.id,
+        mutation.args,
+        current.observation,
+      );
       const withStale = propagateStalenessIfEditingPastStage(current, "observation");
       return { ...withStale, observation };
     }
@@ -67,7 +75,11 @@ function applyMutation(
     case "addQuestion": {
       const withStale = propagateStalenessIfEditingPastStage(current, "questioning");
       const question = {
-        ...buildQuestion(current.session.id, mutation.args.input, withStale.questions.length),
+        ...buildQuestion(
+          current.session.id,
+          mutation.args.input,
+          withStale.questions.length,
+        ),
         hintLevelUsed: mutation.args.hintLevelUsed,
       };
       return { ...withStale, questions: [...withStale.questions, question] };
@@ -86,7 +98,11 @@ function applyMutation(
     }
     case "addExplorationResponse": {
       const withStale = propagateStalenessIfEditingPastStage(current, "exploration");
-      const response = buildStageResponse(current.session.id, "exploration", mutation.args);
+      const response = buildStageResponse(
+        current.session.id,
+        "exploration",
+        mutation.args,
+      );
       const withoutOld = withStale.stageResponses.filter(
         (r) => !(r.stage === "exploration" && r.promptKey === mutation.args.promptKey),
       );
@@ -103,7 +119,11 @@ function applyMutation(
     }
     case "addReframe": {
       const withStale = propagateStalenessIfEditingPastStage(current, "reframing");
-      const reframe = buildReframe(current.session.id, mutation.args.input, withStale.reframes.length);
+      const reframe = buildReframe(
+        current.session.id,
+        mutation.args.input,
+        withStale.reframes.length,
+      );
       return { ...withStale, reframes: [...withStale.reframes, reframe] };
     }
     case "submitDefinition": {
@@ -171,7 +191,10 @@ function applyMutation(
   }
 }
 
-export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
   const { id: sessionId } = await params;
   const ctx = await createRouteContext();
   if (!ctx.ok) return ctx.response;

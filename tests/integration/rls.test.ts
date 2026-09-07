@@ -63,12 +63,18 @@ describe.skipIf(!dbUrl)("RLS — 다른 사용자 접근 차단", () => {
   }
 
   it("소유자는 자신의 세션을 조회할 수 있다", async () => {
-    const rows = await asUser(ownerId, (tx) => tx`select id from public.training_sessions where id = ${sessionId}`);
+    const rows = await asUser(
+      ownerId,
+      (tx) => tx`select id from public.training_sessions where id = ${sessionId}`,
+    );
     expect(rows).toHaveLength(1);
   });
 
   it("다른 사용자는 조회 시 0건이 반환된다 (행 자체가 보이지 않음)", async () => {
-    const rows = await asUser(attackerId, (tx) => tx`select id from public.training_sessions where id = ${sessionId}`);
+    const rows = await asUser(
+      attackerId,
+      (tx) => tx`select id from public.training_sessions where id = ${sessionId}`,
+    );
     expect(rows).toHaveLength(0);
   });
 
@@ -84,12 +90,16 @@ describe.skipIf(!dbUrl)("RLS — 다른 사용자 접근 차단", () => {
   it("다른 사용자는 삭제할 수 없다 (영향받은 행 0건)", async () => {
     const rows = await asUser(
       attackerId,
-      (tx) => tx`delete from public.training_sessions where id = ${sessionId} returning id`,
+      (tx) =>
+        tx`delete from public.training_sessions where id = ${sessionId} returning id`,
     );
     expect(rows).toHaveLength(0);
 
     // 원 소유자에게는 여전히 존재해야 한다 — 삭제 시도가 조용히 성공한 게 아님을 확인.
-    const stillThere = await asUser(ownerId, (tx) => tx`select id from public.training_sessions where id = ${sessionId}`);
+    const stillThere = await asUser(
+      ownerId,
+      (tx) => tx`select id from public.training_sessions where id = ${sessionId}`,
+    );
     expect(stillThere).toHaveLength(1);
   });
 });

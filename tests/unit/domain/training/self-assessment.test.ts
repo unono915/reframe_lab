@@ -14,7 +14,9 @@ import {
 import { makeAIFeedback, makeSnapshot, makeStageResponse } from "./fixtures";
 
 /** 6개 차원에 모두 답한 StageResponse 배열. */
-function answeredAll(status: SelfAssessmentStatus): ReturnType<typeof makeStageResponse>[] {
+function answeredAll(
+  status: SelfAssessmentStatus,
+): ReturnType<typeof makeStageResponse>[] {
   return SELF_CHECK_ITEMS.map((item) =>
     makeStageResponse({
       id: `self-${item.key}`,
@@ -43,7 +45,9 @@ describe("AI_DIMENSION_KEY_BY_SELF_CHECK_KEY", () => {
     const mapped = Object.values(AI_DIMENSION_KEY_BY_SELF_CHECK_KEY);
 
     for (const key of mapped) {
-      expect(aiKeys.has(key as (typeof feedbackDimensionKeySchema.options)[number])).toBe(true);
+      expect(aiKeys.has(key as (typeof feedbackDimensionKeySchema.options)[number])).toBe(
+        true,
+      );
     }
     // 양방향으로 검사한다 — AI 차원이 늘었는데 자기 점검이 안 따라가도 잡아야 한다.
     expect(new Set(mapped).size).toBe(aiKeys.size);
@@ -94,14 +98,16 @@ describe("readSelfAssessment", () => {
 
 describe("hasCompletedSelfAssessment", () => {
   it("6개를 모두 답해야 true", () => {
-    expect(hasCompletedSelfAssessment(makeSnapshot({ stageResponses: answeredAll("shown") }))).toBe(
-      true,
-    );
+    expect(
+      hasCompletedSelfAssessment(makeSnapshot({ stageResponses: answeredAll("shown") })),
+    ).toBe(true);
   });
 
   it("하나라도 빠지면 false — 일부만 답한 채 AI와 대조하지 않는다", () => {
     const partial = answeredAll("shown").slice(0, SELF_CHECK_ITEMS.length - 1);
-    expect(hasCompletedSelfAssessment(makeSnapshot({ stageResponses: partial }))).toBe(false);
+    expect(hasCompletedSelfAssessment(makeSnapshot({ stageResponses: partial }))).toBe(
+      false,
+    );
   });
 });
 
@@ -152,7 +158,10 @@ describe("compareSelfAssessmentWithAi", () => {
 
   it("AI가 판정하지 않은 차원은 자기평가만 남고 어긋남이 아니다", () => {
     const snapshot = makeSnapshot({ stageResponses: answeredAll("not_yet") });
-    const result = compareSelfAssessmentWithAi(snapshot, makeAIFeedback({ dimensions: {} }));
+    const result = compareSelfAssessmentWithAi(
+      snapshot,
+      makeAIFeedback({ dimensions: {} }),
+    );
 
     expect(result).toHaveLength(SELF_CHECK_ITEMS.length);
     expect(result.every((c) => c.ai === null && !c.mismatch)).toBe(true);
@@ -189,7 +198,9 @@ describe("overconfidentDimensions", () => {
       },
     });
 
-    const result = overconfidentDimensions(compareSelfAssessmentWithAi(snapshot, feedback));
+    const result = overconfidentDimensions(
+      compareSelfAssessmentWithAi(snapshot, feedback),
+    );
 
     expect(result.map((c) => c.key)).toEqual(["scope"]);
   });

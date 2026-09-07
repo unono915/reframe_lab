@@ -14,25 +14,21 @@ export async function createSupabaseServerClient() {
   const cookieStore = await cookies();
   const { url, anonKey } = requireSupabaseEnv();
 
-  return createServerClient<Database>(
-    url,
-    anonKey,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            for (const { name, value, options } of cookiesToSet) {
-              cookieStore.set(name, value, options);
-            }
-          } catch {
-            // Server Component에서 호출되면 쓰기가 불가능하다 — middleware가
-            // 세션 갱신을 담당하므로 여기서는 무시해도 안전하다.
+  return createServerClient<Database>(url, anonKey, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll();
+      },
+      setAll(cookiesToSet) {
+        try {
+          for (const { name, value, options } of cookiesToSet) {
+            cookieStore.set(name, value, options);
           }
-        },
+        } catch {
+          // Server Component에서 호출되면 쓰기가 불가능하다 — middleware가
+          // 세션 갱신을 담당하므로 여기서는 무시해도 안전하다.
+        }
       },
     },
-  );
+  });
 }

@@ -220,7 +220,10 @@ export function checkStageRequirement(
  * 판정한다(`app/api/sessions/[id]/coach`, `.../feedback`) — 빈 화면에 대고 AI를
  * 부르지 못하게 막는다.
  */
-export function hasMinimalUserInput(stage: Stage, snapshot: TrainingSessionSnapshot): boolean {
+export function hasMinimalUserInput(
+  stage: Stage,
+  snapshot: TrainingSessionSnapshot,
+): boolean {
   switch (stage) {
     case "not_started":
       return false;
@@ -270,7 +273,9 @@ export function describeRemainingRequirement(
     case "separation":
       return "문장을 하나 이상 분류하고 확인해주세요.";
     case "questioning": {
-      const userQuestions = snapshot.questions.filter((q) => q.authorType === "user").length;
+      const userQuestions = snapshot.questions.filter(
+        (q) => q.authorType === "user",
+      ).length;
       const missingQuestions = Math.max(0, 3 - userQuestions);
       const needsPriority = !snapshot.questions.some(
         (q) => q.isPriority && Boolean(q.priorityReason?.trim()),
@@ -289,7 +294,9 @@ export function describeRemainingRequirement(
       return `아직 답하지 않은 질문이 ${remaining}개 있어요.`;
     }
     case "reframing": {
-      const userReframes = snapshot.reframes.filter((r) => r.authorType === "user").length;
+      const userReframes = snapshot.reframes.filter(
+        (r) => r.authorType === "user",
+      ).length;
       return `대안 프레임 ${Math.max(0, 2 - userReframes)}개를 더 써보면 넘어갈 수 있어요.`;
     }
     case "definition":

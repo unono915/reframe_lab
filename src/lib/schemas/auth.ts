@@ -6,7 +6,11 @@ import { z } from "zod";
  * (DESIGN.md §10.9 Rules: 오류는 §11 UI States의 Validation Treatment를 따른다).
  */
 
-const emailSchema = z.string().trim().min(1, "이메일을 입력해주세요.").email("올바른 이메일 형식이 아니에요.");
+const emailSchema = z
+  .string()
+  .trim()
+  .min(1, "이메일을 입력해주세요.")
+  .email("올바른 이메일 형식이 아니에요.");
 
 // DESIGN.md §10.9.2: "최소 길이 등 규칙을 Helper Text로 상시 노출" — Supabase 기본 정책(8자 이상)과 맞춘다.
 const newPasswordSchema = z

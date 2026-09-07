@@ -11,10 +11,15 @@ describe("CONTRASTIVE_EXAMPLES", () => {
    * 조용히 사라진다 — 재현이 어렵고 눈에 띄지 않는 구멍이라 여기서 막는다.
    */
   it("실제로 쓰이는 모든 렌즈에 사례가 하나씩 있다", () => {
-    const usedLenses = new Set(DAILY_TEMPLATES.filter((t) => t.active).map((t) => t.lensType));
+    const usedLenses = new Set(
+      DAILY_TEMPLATES.filter((t) => t.active).map((t) => t.lensType),
+    );
 
     for (const lens of usedLenses) {
-      expect(contrastiveExampleFor(lens), `${lens} 렌즈에 대조 사례가 없다`).not.toBeNull();
+      expect(
+        contrastiveExampleFor(lens),
+        `${lens} 렌즈에 대조 사례가 없다`,
+      ).not.toBeNull();
     }
   });
 
@@ -37,7 +42,9 @@ describe("CONTRASTIVE_EXAMPLES", () => {
    */
   it("옮겨 적은 문장이 처음 문장보다 구체적이다", () => {
     for (const example of CONTRASTIVE_EXAMPLES) {
-      expect(example.strong.length, example.lensType).toBeGreaterThan(example.weak.length);
+      expect(example.strong.length, example.lensType).toBeGreaterThan(
+        example.weak.length,
+      );
     }
   });
 });

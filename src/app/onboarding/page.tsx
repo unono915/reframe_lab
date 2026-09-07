@@ -69,7 +69,10 @@ export default function OnboardingPage() {
             화면마다 문장이 바뀌므로 aria-live로 알린다 — 시각적으로는 전환이
             분명하지만 스크린리더에는 아무 일도 일어나지 않은 것처럼 들린다.
           */}
-          <h1 className="whitespace-pre-line text-display-lg font-bold text-ink" aria-live="polite">
+          <h1
+            className="whitespace-pre-line text-display-lg font-bold text-ink"
+            aria-live="polite"
+          >
             {step.headline}
           </h1>
           <p className="text-body text-text-secondary">

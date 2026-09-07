@@ -18,7 +18,9 @@ function stubFetch(impl: () => Promise<Response>) {
 
 describe("fetchJson — 성공", () => {
   it("2xx면 파싱한 본문을 돌려준다", async () => {
-    stubFetch(async () => new Response(JSON.stringify({ sessions: [1, 2] }), { status: 200 }));
+    stubFetch(
+      async () => new Response(JSON.stringify({ sessions: [1, 2] }), { status: 200 }),
+    );
     const result = await fetchJson<{ sessions: number[] }>("/api/history");
     expect(result).toEqual({ ok: true, data: { sessions: [1, 2] } });
   });
@@ -52,9 +54,15 @@ describe("fetchJson — 실패해도 절대 throw하지 않는다", () => {
   it("서버가 준 오류 메시지가 있으면 그대로 사용자에게 전한다", async () => {
     stubFetch(
       async () =>
-        new Response(JSON.stringify({ errorCode: "requirement_not_met", message: "먼저 작성해주세요." }), {
-          status: 422,
-        }),
+        new Response(
+          JSON.stringify({
+            errorCode: "requirement_not_met",
+            message: "먼저 작성해주세요.",
+          }),
+          {
+            status: 422,
+          },
+        ),
     );
     const result = await fetchJson("/api/sessions/x/coach");
     expect(result).toEqual({ ok: false, message: "먼저 작성해주세요." });
@@ -92,9 +100,9 @@ describe("toUserMessage", () => {
 
 describe("toDisplayMessage — 우리 메시지와 브라우저 예외를 가른다", () => {
   it("UserFacingError의 메시지는 그대로 보여준다", () => {
-    expect(toDisplayMessage(new UserFacingError("오늘의 렌즈를 불러오지 못했어요."))).toBe(
-      "오늘의 렌즈를 불러오지 못했어요.",
-    );
+    expect(
+      toDisplayMessage(new UserFacingError("오늘의 렌즈를 불러오지 못했어요.")),
+    ).toBe("오늘의 렌즈를 불러오지 못했어요.");
   });
 
   it("네트워크 예외는 연결 안내로 바꾼다 — 영어 원문을 그대로 두지 않는다", () => {

@@ -9,7 +9,11 @@ import { getActiveCoachProvider } from "@/lib/ai/providers";
 import { feedbackOutputSchema } from "@/lib/schemas/feedback-output";
 import { checkRateLimit, SESSION_AI_CALL_CAP } from "@/lib/rate-limit";
 import { apiError } from "@/lib/errors";
-import { createRouteContext, loadOwnedSnapshot, withIdempotency } from "../../../_lib/route-context";
+import {
+  createRouteContext,
+  loadOwnedSnapshot,
+  withIdempotency,
+} from "../../../_lib/route-context";
 
 const requestSchema = z.object({ clientRequestId: z.string().min(1) });
 
@@ -19,7 +23,10 @@ const requestSchema = z.object({ clientRequestId: z.string().min(1) });
  * 체크리스트다(requirements.ts checkFeedback의 예외 경로). 이 Route는 실패 시
  * 그냥 오류를 반환하고, 클라이언트는 이미 있는 체크리스트 UI로 계속한다.
  */
-export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
   const { id: sessionId } = await params;
   const ctx = await createRouteContext();
   if (!ctx.ok) return ctx.response;
@@ -27,7 +34,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const json = await request.json().catch(() => null);
   const parsed = requestSchema.safeParse(json);
-  if (!parsed.success) return apiError("validation_error", parsed.error.issues[0]?.message);
+  if (!parsed.success)
+    return apiError("validation_error", parsed.error.issues[0]?.message);
   const { clientRequestId } = parsed.data;
 
   return withIdempotency(supabase, userId, clientRequestId, async () => {
@@ -35,7 +43,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!current) return apiError("not_found");
 
     if (!hasMinimalUserInput("definition", current)) {
-      return apiError("requirement_not_met", "먼저 문제 정의를 작성한 뒤에 피드백을 요청할 수 있어요.");
+      return apiError(
+        "requirement_not_met",
+        "먼저 문제 정의를 작성한 뒤에 피드백을 요청할 수 있어요.",
+      );
     }
     if (current.session.aiCallCount >= SESSION_AI_CALL_CAP) {
       return apiError(
@@ -45,7 +56,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
     const rateLimit = checkRateLimit(userId);
     if (!rateLimit.ok) {
-      return apiError("validation_error", "너무 빠르게 요청했어요. 잠시 후 다시 시도해주세요.");
+      return apiError(
+        "validation_error",
+        "너무 빠르게 요청했어요. 잠시 후 다시 시도해주세요.",
+      );
     }
 
     const latest = [...current.problemDefinitionVersions].sort(
@@ -60,7 +74,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       ...current.stageResponses
         .filter((r) => r.stage === "exploration" && !r.isDraft)
         .map((r) => r.content),
-      ...current.perspectives.filter((p) => p.authorType === "user").map((p) => p.content),
+      ...current.perspectives
+        .filter((p) => p.authorType === "user")
+        .map((p) => p.content),
       ...current.reframes.filter((r) => r.authorType === "user").map((r) => r.text),
       latest.text,
     ].join("\n");

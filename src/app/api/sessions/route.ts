@@ -36,7 +36,8 @@ export async function POST(request: NextRequest) {
 
   const json = await request.json().catch(() => null);
   const parsed = createSessionSchema.safeParse(json);
-  if (!parsed.success) return apiError("validation_error", parsed.error.issues[0]?.message);
+  if (!parsed.success)
+    return apiError("validation_error", parsed.error.issues[0]?.message);
   const { clientGeneratedId, templateId, timezone, clientRequestId } = parsed.data;
 
   return withIdempotency(supabase, userId, clientRequestId, async () => {
@@ -50,7 +51,10 @@ export async function POST(request: NextRequest) {
       });
       return NextResponse.json({ snapshot }, { status: 201 });
     } catch {
-      return apiError("validation_error", "세션을 만들지 못했어요. 템플릿을 확인해주세요.");
+      return apiError(
+        "validation_error",
+        "세션을 만들지 못했어요. 템플릿을 확인해주세요.",
+      );
     }
   });
 }

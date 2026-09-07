@@ -205,7 +205,9 @@ describe("createMemorySessionRepository", () => {
     expect(page2.map((s) => s.id)).toEqual(newestFirst.slice(2, 4));
     expect(page3.map((s) => s.id)).toEqual(newestFirst.slice(4));
     // 끝을 넘어선 offset은 오류가 아니라 빈 목록이다 — "더 보기"가 마지막에 멈추는 근거.
-    expect(await repo.listSessionSummariesForUser(userId, { limit: 2, offset: 5 })).toEqual([]);
+    expect(
+      await repo.listSessionSummariesForUser(userId, { limit: 2, offset: 5 }),
+    ).toEqual([]);
   });
 
   it("listSessionSummariesForUser derives Growth 집계 필드를 스냅샷에서 정확히 뽑는다", async () => {

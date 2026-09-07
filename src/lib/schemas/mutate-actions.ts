@@ -32,7 +32,10 @@ export const mutateActionSchema = z.discriminatedUnion("action", [
     action: z.literal("addQuestion"),
     args: z.object({ input: questionInputSchema, hintLevelUsed: hintLevelSchema }),
   }),
-  z.object({ action: z.literal("markPriorityQuestion"), args: priorityQuestionInputSchema }),
+  z.object({
+    action: z.literal("markPriorityQuestion"),
+    args: priorityQuestionInputSchema,
+  }),
   z.object({
     action: z.literal("addExplorationResponse"),
     args: explorationResponseInputSchema,
@@ -43,7 +46,10 @@ export const mutateActionSchema = z.discriminatedUnion("action", [
     args: z.object({ input: reframeInputSchema, hintLevelUsed: hintLevelSchema }),
   }),
   z.object({ action: z.literal("submitDefinition"), args: problemDefinitionInputSchema }),
-  z.object({ action: z.literal("submitExceptionReason"), args: stageResponseInputSchema }),
+  z.object({
+    action: z.literal("submitExceptionReason"),
+    args: stageResponseInputSchema,
+  }),
   // 자기 점검이 정규 단계가 되면서 "확인했다"는 플래그가 아니라 차원별 판단을 받는다
   // (RESEARCH_VALIDATION.md §5 P0-2). 완료 표시(self_checklist_completed)도 함께 남겨
   // `requirements.ts checkFeedback`의 기존 판정은 그대로 유지된다.

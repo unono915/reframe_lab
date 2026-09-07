@@ -86,7 +86,12 @@ const layerBoundaries = [
       "no-restricted-imports": [
         "error",
         {
-          patterns: ["@/lib/repositories/*", "@/lib/ai/*", "@/lib/supabase/*", "@supabase/*"],
+          patterns: [
+            "@/lib/repositories/*",
+            "@/lib/ai/*",
+            "@/lib/supabase/*",
+            "@supabase/*",
+          ],
         },
       ],
     },

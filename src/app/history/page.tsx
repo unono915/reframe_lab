@@ -39,16 +39,19 @@ export default function HistoryPage() {
   /** 이어 받기 실패는 이미 보고 있는 목록을 지우지 않는다 — 그 자리에서만 알린다. */
   const [moreError, setMoreError] = useState<string | null>(null);
 
-  const apply = useCallback(({ history, templates }: Awaited<ReturnType<typeof fetchHistory>>) => {
-    if (!history.ok) {
-      setError(history.message);
-      return;
-    }
-    setSessions(history.data.sessions);
-    setNextOffset(history.data.nextOffset);
-    // 템플릿은 보조 정보(렌즈 이름)라 실패해도 목록 자체는 보여준다.
-    if (templates.ok) setTemplates(templates.data.templates);
-  }, []);
+  const apply = useCallback(
+    ({ history, templates }: Awaited<ReturnType<typeof fetchHistory>>) => {
+      if (!history.ok) {
+        setError(history.message);
+        return;
+      }
+      setSessions(history.data.sessions);
+      setNextOffset(history.data.nextOffset);
+      // 템플릿은 보조 정보(렌즈 이름)라 실패해도 목록 자체는 보여준다.
+      if (templates.ok) setTemplates(templates.data.templates);
+    },
+    [],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -69,20 +72,25 @@ export default function HistoryPage() {
     if (nextOffset === null || loadingMore) return;
     setLoadingMore(true);
     setMoreError(null);
-    void fetchJson<HistoryPageData>(`/api/history?offset=${nextOffset}`).then((result) => {
-      setLoadingMore(false);
-      if (!result.ok) {
-        setMoreError(result.message);
-        return;
-      }
-      // offset 기준 페이지라, 사이에 새 기록이 생기면 경계가 한 칸 밀려 같은 기록이
-      // 두 번 올 수 있다. React key 중복과 중복 표시를 막기 위해 id로 걸러 붙인다.
-      setSessions((prev) => {
-        const seen = new Set((prev ?? []).map((s) => s.id));
-        return [...(prev ?? []), ...result.data.sessions.filter((s) => !seen.has(s.id))];
-      });
-      setNextOffset(result.data.nextOffset);
-    });
+    void fetchJson<HistoryPageData>(`/api/history?offset=${nextOffset}`).then(
+      (result) => {
+        setLoadingMore(false);
+        if (!result.ok) {
+          setMoreError(result.message);
+          return;
+        }
+        // offset 기준 페이지라, 사이에 새 기록이 생기면 경계가 한 칸 밀려 같은 기록이
+        // 두 번 올 수 있다. React key 중복과 중복 표시를 막기 위해 id로 걸러 붙인다.
+        setSessions((prev) => {
+          const seen = new Set((prev ?? []).map((s) => s.id));
+          return [
+            ...(prev ?? []),
+            ...result.data.sessions.filter((s) => !seen.has(s.id)),
+          ];
+        });
+        setNextOffset(result.data.nextOffset);
+      },
+    );
   }
 
   const templateById = useMemo(
@@ -121,7 +129,9 @@ export default function HistoryPage() {
       {sessions.length === 0 ? (
         <Stack gap={4}>
           <Card variant="neutral">
-            <p className="text-body text-ink">첫 기록은 오늘의 장면에서 시작할 수 있어요.</p>
+            <p className="text-body text-ink">
+              첫 기록은 오늘의 장면에서 시작할 수 있어요.
+            </p>
           </Card>
           <LinkButton href="/training/new" variant="primary" fullWidth>
             오늘의 훈련 시작
@@ -154,7 +164,9 @@ export default function HistoryPage() {
                           </Badge>
                         </Stack>
                         {template && (
-                          <p className="text-caption text-text-tertiary">{template.title}</p>
+                          <p className="text-caption text-text-tertiary">
+                            {template.title}
+                          </p>
                         )}
                         <p className="line-clamp-2 text-body text-ink">
                           {s.observationText || "(관찰 작성 전)"}

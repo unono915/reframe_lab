@@ -45,7 +45,9 @@ function extractCurrentStageText(
         .join("\n");
     case "reframing":
       return [
-        ...snapshot.perspectives.filter((p) => p.authorType === "user").map((p) => p.content),
+        ...snapshot.perspectives
+          .filter((p) => p.authorType === "user")
+          .map((p) => p.content),
         ...snapshot.reframes.filter((r) => r.authorType === "user").map((r) => r.text),
       ].join("\n");
     case "definition":

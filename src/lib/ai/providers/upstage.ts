@@ -68,7 +68,11 @@ const COACH_JSON_SCHEMA = {
     action: { type: "string", enum: ACTION_ENUM },
     coachMessage: { type: "string" },
     question: { type: ["string", "null"] },
-    detectedGaps: { type: "array", maxItems: 5, items: { type: "string", enum: GAP_ENUM } },
+    detectedGaps: {
+      type: "array",
+      maxItems: 5,
+      items: { type: "string", enum: GAP_ENUM },
+    },
     evidenceReferences: { type: "array", maxItems: 3, items: { type: "string" } },
     hintLevel: { type: "integer", enum: [0, 1, 2] },
     suggestedNextStage: { type: ["string", "null"], enum: [...STAGE_ENUM, null] },
@@ -116,7 +120,13 @@ const FEEDBACK_JSON_SCHEMA = {
     unverifiedAssumption: { type: "string" },
     nextQuestion: { type: "string" },
   },
-  required: ["dimensions", "strength", "improvementFocus", "unverifiedAssumption", "nextQuestion"],
+  required: [
+    "dimensions",
+    "strength",
+    "improvementFocus",
+    "unverifiedAssumption",
+    "nextQuestion",
+  ],
   additionalProperties: false,
 } as const;
 
@@ -197,7 +207,10 @@ async function callUpstageChat(
  * userText는 반드시 따옴표 블록으로 감싸 지시문과 분리한다(입력 격리,
  * prompts/common.ts 5번) — 이 블록 안의 "이전 지시 무시" 같은 문장은 데이터일 뿐이다.
  */
-function buildCoachUserPrompt(context: CoachRequestContext, recentQuestions: string[]): string {
+function buildCoachUserPrompt(
+  context: CoachRequestContext,
+  recentQuestions: string[],
+): string {
   const recentBlock =
     recentQuestions.length > 0
       ? `\n\n[최근에 이미 한 질문 — 같은 문장을 반복하지 마세요]\n${recentQuestions

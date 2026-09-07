@@ -2,7 +2,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { resumeSession } from "@/domain/training/state-machine";
 import { apiError, type ApiErrorCode } from "@/lib/errors";
-import { createRouteContext, loadOwnedSnapshot, withIdempotency } from "../../../_lib/route-context";
+import {
+  createRouteContext,
+  loadOwnedSnapshot,
+  withIdempotency,
+} from "../../../_lib/route-context";
 
 const requestSchema = z.object({
   expectedStateVersion: z.number().int().min(0),
@@ -10,7 +14,10 @@ const requestSchema = z.object({
 });
 
 /** DESIGN.md §9.2·§9.3: "/training/:id 진입 자체가 '이어서 하기' 행동이다." */
-export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
   const { id: sessionId } = await params;
   const ctx = await createRouteContext();
   if (!ctx.ok) return ctx.response;
@@ -18,7 +25,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const json = await request.json().catch(() => null);
   const parsed = requestSchema.safeParse(json);
-  if (!parsed.success) return apiError("validation_error", parsed.error.issues[0]?.message);
+  if (!parsed.success)
+    return apiError("validation_error", parsed.error.issues[0]?.message);
 
   return withIdempotency(supabase, userId, parsed.data.clientRequestId, async () => {
     const current = await loadOwnedSnapshot(repos, sessionId, userId);
@@ -26,7 +34,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const result = resumeSession(current.session, parsed.data.expectedStateVersion);
     if (!result.ok) {
-      return apiError(result.errorCode as ApiErrorCode, result.message, { snapshot: current });
+      return apiError(result.errorCode as ApiErrorCode, result.message, {
+        snapshot: current,
+      });
     }
 
     const saved = await repos.sessionRepository.saveSnapshot({

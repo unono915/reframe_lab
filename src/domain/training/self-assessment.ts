@@ -134,7 +134,8 @@ export function compareSelfAssessmentWithAi(
     const self = assessment[item.key];
     if (self === undefined) return [];
 
-    const aiDimension = feedback?.dimensions[AI_DIMENSION_KEY_BY_SELF_CHECK_KEY[item.key]];
+    const aiDimension =
+      feedback?.dimensions[AI_DIMENSION_KEY_BY_SELF_CHECK_KEY[item.key]];
     const ai = aiDimension ? normalizeAiDimensionStatus(aiDimension.status) : null;
 
     return [

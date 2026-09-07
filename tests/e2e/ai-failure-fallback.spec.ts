@@ -47,14 +47,20 @@ async function breakAiRoutes(page: Page): Promise<void> {
     route.fulfill({
       status: 500,
       contentType: "application/json",
-      body: JSON.stringify({ errorCode: "internal_error", message: "코치를 부르지 못했어요." }),
+      body: JSON.stringify({
+        errorCode: "internal_error",
+        message: "코치를 부르지 못했어요.",
+      }),
     }),
   );
   await page.route("**/api/sessions/*/feedback", (route) =>
     route.fulfill({
       status: 500,
       contentType: "application/json",
-      body: JSON.stringify({ errorCode: "internal_error", message: "코치를 부르지 못했어요." }),
+      body: JSON.stringify({
+        errorCode: "internal_error",
+        message: "코치를 부르지 못했어요.",
+      }),
     }),
   );
 }

@@ -3,7 +3,8 @@
  * 추가하면 이 파일을 다시 생성한다. 단일 소스는 여전히 `domain/types.ts`이고, 이 파일은
  * 그 결과물이 실제 DB 스키마와 일치하는지 컴파일 타임에 검증하는 용도다.
  */
-export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+export type Json =
+  string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Database = {
   __InternalSupabase: {

@@ -30,7 +30,10 @@ describe("upstageCoachProvider — 실패를 구분 가능한 형태로 던진�
     // AbortController가 끊은 요청은 name이 "AbortError"인 예외로 올라온다.
     const abortError = new Error("The operation was aborted.");
     abortError.name = "AbortError";
-    vi.stubGlobal("fetch", vi.fn(() => Promise.reject(abortError)));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(abortError)),
+    );
 
     await expect(upstageCoachProvider.getCoachResponse(CONTEXT)).rejects.toBeInstanceOf(
       AiTimeoutError,
@@ -40,9 +43,14 @@ describe("upstageCoachProvider — 실패를 구분 가능한 형태로 던진�
   it("그 오류는 '재시도하지 말 것'으로 분류된다", async () => {
     const abortError = new Error("aborted");
     abortError.name = "AbortError";
-    vi.stubGlobal("fetch", vi.fn(() => Promise.reject(abortError)));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(abortError)),
+    );
 
-    const error = await upstageCoachProvider.getCoachResponse(CONTEXT).catch((e: unknown) => e);
+    const error = await upstageCoachProvider
+      .getCoachResponse(CONTEXT)
+      .catch((e: unknown) => e);
     expect(isUnretryableAiError(error)).toBe(true);
   });
 
@@ -52,7 +60,9 @@ describe("upstageCoachProvider — 실패를 구분 가능한 형태로 던진�
       vi.fn(() => Promise.resolve(new Response("", { status: 502 }))),
     );
 
-    const error = await upstageCoachProvider.getCoachResponse(CONTEXT).catch((e: unknown) => e);
+    const error = await upstageCoachProvider
+      .getCoachResponse(CONTEXT)
+      .catch((e: unknown) => e);
     expect(error).toBeInstanceOf(Error);
     expect(isUnretryableAiError(error)).toBe(false);
   });
@@ -67,7 +77,9 @@ describe("upstageCoachProvider — 실패를 구분 가능한 형태로 던진�
       vi.fn(() => Promise.resolve(new Response("", { status }))),
     );
 
-    const error = await upstageCoachProvider.getCoachResponse(CONTEXT).catch((e: unknown) => e);
+    const error = await upstageCoachProvider
+      .getCoachResponse(CONTEXT)
+      .catch((e: unknown) => e);
     // 같은 요청을 그대로 다시 보내도 같은 답이 온다 — 20초를 한 번 더 쓰지 않는다.
     expect(isUnretryableAiError(error)).toBe(true);
   });
@@ -78,7 +90,9 @@ describe("upstageCoachProvider — 실패를 구분 가능한 형태로 던진�
       vi.fn(() => Promise.resolve(new Response("", { status: 408 }))),
     );
 
-    const error = await upstageCoachProvider.getCoachResponse(CONTEXT).catch((e: unknown) => e);
+    const error = await upstageCoachProvider
+      .getCoachResponse(CONTEXT)
+      .catch((e: unknown) => e);
     expect(isUnretryableAiError(error)).toBe(false);
   });
 
@@ -92,7 +106,9 @@ describe("upstageCoachProvider — 실패를 구분 가능한 형태로 던진�
       ),
     );
 
-    await expect(upstageCoachProvider.getCoachResponse(CONTEXT)).rejects.toThrow(/content/);
+    await expect(upstageCoachProvider.getCoachResponse(CONTEXT)).rejects.toThrow(
+      /content/,
+    );
   });
 
   it("API Key가 없으면 호출 전에 멈춘다", async () => {
@@ -122,7 +138,9 @@ describe("upstageCoachProvider — 사용자 입력을 프롬프트에 격리해
     const fetchSpy = vi.fn<typeof fetch>(() =>
       Promise.resolve(
         new Response(
-          JSON.stringify({ choices: [{ message: { content: JSON.stringify({ ok: true }) } }] }),
+          JSON.stringify({
+            choices: [{ message: { content: JSON.stringify({ ok: true }) } }],
+          }),
           { status: 200 },
         ),
       ),
@@ -145,10 +163,9 @@ describe("upstageCoachProvider — 사용자 입력을 프롬프트에 격리해
   it("Structured Output을 스키마로 강제한다 — 형식을 모델의 선의에 맡기지 않는다", async () => {
     const fetchSpy = vi.fn<typeof fetch>(() =>
       Promise.resolve(
-        new Response(
-          JSON.stringify({ choices: [{ message: { content: "{}" } }] }),
-          { status: 200 },
-        ),
+        new Response(JSON.stringify({ choices: [{ message: { content: "{}" } }] }), {
+          status: 200,
+        }),
       ),
     );
     vi.stubGlobal("fetch", fetchSpy);

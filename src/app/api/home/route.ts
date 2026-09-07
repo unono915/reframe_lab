@@ -21,13 +21,17 @@ export async function GET(request: NextRequest) {
 
   const timezone = request.nextUrl.searchParams.get("timezone") ?? "UTC";
   const today = todayDateString(timezone);
-  const sessions = await repos.sessionRepository.listSessionSummariesForUser(userId, { limit: 100 });
+  const sessions = await repos.sessionRepository.listSessionSummariesForUser(userId, {
+    limit: 100,
+  });
 
   const recentRecord = sessions.find((s) => s.status === "completed") ?? null;
   const candidate = suggestRevisitCandidate(sessions, today);
 
   return NextResponse.json({
     recentRecord,
-    revisitCandidate: candidate ? { session: candidate, days: daysSince(candidate, today) } : null,
+    revisitCandidate: candidate
+      ? { session: candidate, days: daysSince(candidate, today) }
+      : null,
   });
 }

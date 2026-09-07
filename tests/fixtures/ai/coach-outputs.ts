@@ -35,7 +35,8 @@ export const FABRICATED_NUMBER_OUTPUT: CoachOutputSchema = {
 export const GHOSTWRITING_OUTPUT: CoachOutputSchema = {
   ...VALID_OUTPUT,
   currentStage: "definition",
-  coachMessage: "회의에서 발표자는 시간 부족 때문에 충분한 설명을 겪는다고 정리할 수 있어요.",
+  coachMessage:
+    "회의에서 발표자는 시간 부족 때문에 충분한 설명을 겪는다고 정리할 수 있어요.",
 };
 
 export const SOLUTION_SUGGESTED_OUTPUT: CoachOutputSchema = {

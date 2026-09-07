@@ -39,7 +39,10 @@ function emailRedirectTo(path: string): string {
   return `${window.location.origin}${path}`;
 }
 
-export async function signInWithEmail(email: string, password: string): Promise<AuthResult> {
+export async function signInWithEmail(
+  email: string,
+  password: string,
+): Promise<AuthResult> {
   const supabase = await browserClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
@@ -49,7 +52,10 @@ export async function signInWithEmail(email: string, password: string): Promise<
   return { ok: true };
 }
 
-export async function signUpWithEmail(email: string, password: string): Promise<AuthResult> {
+export async function signUpWithEmail(
+  email: string,
+  password: string,
+): Promise<AuthResult> {
   const supabase = await browserClient();
   const { error } = await supabase.auth.signUp({
     email,

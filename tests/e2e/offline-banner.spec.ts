@@ -37,7 +37,10 @@ test("연결이 끊기면 알리고, 돌아오면 사라진다", async ({ page, 
   await expect(banner).toBeHidden();
 });
 
-test("오프라인이어도 작성 중인 내용은 화면에 그대로 남는다", async ({ page, context }) => {
+test("오프라인이어도 작성 중인 내용은 화면에 그대로 남는다", async ({
+  page,
+  context,
+}) => {
   await page.goto("/training/new");
   await expect(page.getByText("1 / 7 관찰")).toBeVisible();
   await settle(page);

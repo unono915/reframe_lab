@@ -71,13 +71,19 @@ describe("computeGrowthMetrics — 최근 4주 Rhythm", () => {
   });
 
   it("4주보다 오래된 완료 세션은 버킷에 포함되지 않는다(총계에는 포함)", () => {
-    const metrics = computeGrowthMetrics([makeSummary({ trainingDate: "2026-06-01" })], TODAY);
+    const metrics = computeGrowthMetrics(
+      [makeSummary({ trainingDate: "2026-06-01" })],
+      TODAY,
+    );
     expect(metrics.totalCompleted).toBe(1);
     expect(metrics.recentWeeks.every((w) => w.completedCount === 0)).toBe(true);
   });
 
   it("주 경계(월요일 당일)는 그 주에 포함된다", () => {
-    const metrics = computeGrowthMetrics([makeSummary({ trainingDate: "2026-08-10" })], TODAY);
+    const metrics = computeGrowthMetrics(
+      [makeSummary({ trainingDate: "2026-08-10" })],
+      TODAY,
+    );
     expect(metrics.completedThisWeek).toBe(1);
   });
 });

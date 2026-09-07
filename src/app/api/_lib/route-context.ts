@@ -27,7 +27,12 @@ export async function createRouteContext(): Promise<
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, response: apiError("unauthorized") };
-  return { ok: true, supabase, userId: user.id, repos: createSupabaseRepositories(supabase) };
+  return {
+    ok: true,
+    supabase,
+    userId: user.id,
+    repos: createSupabaseRepositories(supabase),
+  };
 }
 
 /**
@@ -68,7 +73,13 @@ export async function withIdempotency(
   const body: unknown = await response.json();
 
   try {
-    await recordIdempotentResponse(supabase, userId, clientRequestId, response.status, body);
+    await recordIdempotentResponse(
+      supabase,
+      userId,
+      clientRequestId,
+      response.status,
+      body,
+    );
   } catch (error) {
     // 멱등성 키 기록은 뒷정리다. 여기서 실패했다고 이미 커밋된 변경을 오류로
     // 되돌려 알리면, 사용자는 성공한 저장을 실패로 보고 다시 시도하게 된다.

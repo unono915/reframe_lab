@@ -70,10 +70,8 @@ export const STAGE_RATIONALE: Record<Exclude<Stage, "not_started">, string> = {
     "누가 어떤 상황에서 겪는지가 빠지면, 나에게만 문제인 것을 모두의 문제로 쓰게 돼요.",
   reframing:
     "사람은 처음 떠올린 틀에 고정되는 경향이 있어요. 그래서 일부러 다른 틀을 더 써봐요.",
-  definition:
-    "좋은 정의는 멋진 문장이 아니라 누가·무엇을·왜가 드러난 문장이에요.",
-  feedback:
-    "무엇이 왜 달라졌는지 스스로 설명할 때 생각이 가장 오래 남아요.",
+  definition: "좋은 정의는 멋진 문장이 아니라 누가·무엇을·왜가 드러난 문장이에요.",
+  feedback: "무엇이 왜 달라졌는지 스스로 설명할 때 생각이 가장 오래 남아요.",
 };
 
 export function stageRationale(stage: Stage): string | null {

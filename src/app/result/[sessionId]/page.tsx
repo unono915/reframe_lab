@@ -19,7 +19,10 @@ function detectTimezone(): string {
   }
 }
 
-const AUTHOR_BADGE: Record<AuthorType, { label: string; variant: "user" | "ai" | "system" }> = {
+const AUTHOR_BADGE: Record<
+  AuthorType,
+  { label: string; variant: "user" | "ai" | "system" }
+> = {
   user: { label: "내가 쓴 문장", variant: "user" },
   ai: { label: "다시봄 코치", variant: "ai" },
   system_template: { label: "오늘의 관찰 렌즈", variant: "system" },
@@ -58,7 +61,9 @@ export default function ResultPage() {
   const router = useRouter();
   const [snapshot, setSnapshot] = useState<TrainingSessionSnapshot | null>(null);
   const [template, setTemplate] = useState<TrainingTemplate | null>(null);
-  const [originSnapshot, setOriginSnapshot] = useState<TrainingSessionSnapshot | null>(null);
+  const [originSnapshot, setOriginSnapshot] = useState<TrainingSessionSnapshot | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
   const [revisitPending, setRevisitPending] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -80,7 +85,8 @@ export default function ResultPage() {
     // 렌즈 이름은 보조 정보라 실패해도 본문은 보여준다.
     if (loaded && result.templates.ok) {
       setTemplate(
-        result.templates.data.templates.find((t) => t.id === loaded.session.templateId) ?? null,
+        result.templates.data.templates.find((t) => t.id === loaded.session.templateId) ??
+          null,
       );
     }
     setLoading(false);
@@ -92,7 +98,9 @@ export default function ResultPage() {
       if (cancelled) return;
       apply(result);
       // 원본 기록은 Revisit 세션에서만 쓰는 보조 카드라, 실패해도 본문은 그대로 보여준다.
-      const originId = result.session.ok ? result.session.data.snapshot?.session.originSessionId : null;
+      const originId = result.session.ok
+        ? result.session.data.snapshot?.session.originSessionId
+        : null;
       if (!originId) return;
       void fetchJson<{ snapshot: TrainingSessionSnapshot | null }>(
         `/api/sessions/${originId}`,
@@ -179,7 +187,9 @@ export default function ResultPage() {
 
   const confirmedItems = snapshot.observationItems.filter((i) => i.userConfirmed);
   const priorityQuestion = snapshot.questions.find((q) => q.isPriority);
-  const otherQuestions = snapshot.questions.filter((q) => q.authorType === "user" && !q.isPriority);
+  const otherQuestions = snapshot.questions.filter(
+    (q) => q.authorType === "user" && !q.isPriority,
+  );
   const explorationResponses = snapshot.stageResponses.filter(
     (r) => r.stage === "exploration" && !r.isDraft,
   );
@@ -190,12 +200,18 @@ export default function ResultPage() {
       <Stack gap={2}>
         <Stack direction="row" justify="between" align="center" gap={2}>
           <p className="text-caption font-bold text-success">지금의 생각을 기록했어요.</p>
-          <Button type="button" variant="tertiary" onClick={() => router.push("/history")}>
+          <Button
+            type="button"
+            variant="tertiary"
+            onClick={() => router.push("/history")}
+          >
             기록 목록
           </Button>
         </Stack>
         <Stack direction="row" gap={2} align="center">
-          <p className="text-caption text-text-secondary">{snapshot.session.trainingDate}</p>
+          <p className="text-caption text-text-secondary">
+            {snapshot.session.trainingDate}
+          </p>
           {template && <Badge variant="system">{template.title}</Badge>}
           <Badge variant={snapshot.session.status === "completed" ? "brand" : "neutral"}>
             {sessionStatusLabel(snapshot.session.status)}
@@ -224,10 +240,14 @@ export default function ResultPage() {
             <p className="text-body text-ink">{first.text}</p>
           </Card>
           <Card variant="cream">
-            <p className="text-label font-bold text-brand-strong">지금 생각 (v{latest.versionNumber})</p>
+            <p className="text-label font-bold text-brand-strong">
+              지금 생각 (v{latest.versionNumber})
+            </p>
             <p className="text-body text-ink">{latest.text}</p>
             {latest.changeReason && (
-              <p className="mt-2 text-caption text-text-secondary">바꾼 이유: {latest.changeReason}</p>
+              <p className="mt-2 text-caption text-text-secondary">
+                바꾼 이유: {latest.changeReason}
+              </p>
             )}
           </Card>
         </Stack>
@@ -237,8 +257,8 @@ export default function ResultPage() {
         <Stack gap={3}>
           <p className="text-heading-3 font-bold text-ink">원본 기록과 나란히 비교</p>
           <p className="text-caption text-text-secondary">
-            {originSnapshot.session.trainingDate}에 다시 본 장면을 여기서 다시 생각해봤어요.
-            원본은 바뀌지 않아요.
+            {originSnapshot.session.trainingDate}에 다시 본 장면을 여기서 다시
+            생각해봤어요. 원본은 바뀌지 않아요.
           </p>
           <Card variant="neutral">
             <p className="text-label font-bold text-text-secondary">
@@ -361,7 +381,9 @@ export default function ResultPage() {
         </Stack>
       ) : (
         staleFeedbackExists && (
-          <Badge variant="stale">앞선 내용을 수정해 이 피드백은 다시 확인이 필요해요.</Badge>
+          <Badge variant="stale">
+            앞선 내용을 수정해 이 피드백은 다시 확인이 필요해요.
+          </Badge>
         )
       )}
 
@@ -371,7 +393,13 @@ export default function ResultPage() {
             {actionError}
           </p>
         )}
-        <Button type="button" variant="secondary" fullWidth onClick={handleRevisit} disabled={revisitPending}>
+        <Button
+          type="button"
+          variant="secondary"
+          fullWidth
+          onClick={handleRevisit}
+          disabled={revisitPending}
+        >
           {revisitPending ? "새 기록을 만드는 중" : "이 장면 다시 생각하기"}
         </Button>
 
@@ -398,7 +426,11 @@ export default function ResultPage() {
               >
                 {deletePending ? "삭제하는 중" : "삭제 확정"}
               </Button>
-              <Button type="button" variant="tertiary" onClick={() => setConfirmingDelete(false)}>
+              <Button
+                type="button"
+                variant="tertiary"
+                onClick={() => setConfirmingDelete(false)}
+              >
                 취소
               </Button>
             </Stack>

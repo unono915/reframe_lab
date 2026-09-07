@@ -75,7 +75,9 @@ describe("findIdempotentResponse", () => {
 
   it("조회 오류는 삼키지 않고 던진다", async () => {
     const { client } = fakeClient({ data: null, error: new Error("연결 실패") });
-    await expect(findIdempotentResponse(client, "user-1", "req-1")).rejects.toThrow("연결 실패");
+    await expect(findIdempotentResponse(client, "user-1", "req-1")).rejects.toThrow(
+      "연결 실패",
+    );
   });
 });
 

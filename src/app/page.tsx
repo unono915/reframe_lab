@@ -34,9 +34,12 @@ async function fetchHome(): Promise<HomeData> {
 
   const active = activeResult.data.snapshot;
   if (active) {
-    const templatesResult = await fetchJson<{ templates: TrainingTemplate[] }>("/api/templates");
+    const templatesResult = await fetchJson<{ templates: TrainingTemplate[] }>(
+      "/api/templates",
+    );
     const template = templatesResult.ok
-      ? (templatesResult.data.templates.find((t) => t.id === active.session.templateId) ?? null)
+      ? (templatesResult.data.templates.find((t) => t.id === active.session.templateId) ??
+        null)
       : null;
     return { ok: true, activeSession: active.session, template };
   }
@@ -114,7 +117,9 @@ export default function HomePage() {
   }
 
   if (status === "error") {
-    return <PageState status="error" message={error ?? undefined} onRetry={handleRetry} />;
+    return (
+      <PageState status="error" message={error ?? undefined} onRetry={handleRetry} />
+    );
   }
 
   const isResuming = activeSession && activeSession.status !== "completed";
@@ -125,10 +130,18 @@ export default function HomePage() {
       <Stack gap={8}>
         <Stack direction="row" justify="between" align="center" gap={2}>
           <Stack direction="row" gap={4}>
-            <Button type="button" variant="tertiary" onClick={() => router.push("/history")}>
+            <Button
+              type="button"
+              variant="tertiary"
+              onClick={() => router.push("/history")}
+            >
               기록
             </Button>
-            <Button type="button" variant="tertiary" onClick={() => router.push("/growth")}>
+            <Button
+              type="button"
+              variant="tertiary"
+              onClick={() => router.push("/growth")}
+            >
               성장
             </Button>
           </Stack>
@@ -177,7 +190,8 @@ export default function HomePage() {
             <Stack gap={2}>
               <p className="text-label font-bold text-brand-strong">다시 볼 만한 기록</p>
               <p className="line-clamp-2 text-body text-ink">
-                {revisitCandidate.latestDefinitionText ?? revisitCandidate.observationText}
+                {revisitCandidate.latestDefinitionText ??
+                  revisitCandidate.observationText}
               </p>
               <p className="text-caption text-text-secondary">
                 {revisitDays}일 전에 쓴 문장이에요. 지금 다시 보면 어떻게 보일까요?
@@ -186,9 +200,14 @@ export default function HomePage() {
           </Card>
         ) : (
           recentRecord && (
-            <Card variant="interactive" onClick={() => router.push(`/result/${recentRecord.id}`)}>
+            <Card
+              variant="interactive"
+              onClick={() => router.push(`/result/${recentRecord.id}`)}
+            >
               <Stack gap={2}>
-                <p className="text-label font-bold text-text-secondary">최근 다시 본 기록</p>
+                <p className="text-label font-bold text-text-secondary">
+                  최근 다시 본 기록
+                </p>
                 <p className="line-clamp-2 text-body text-ink">
                   {recentRecord.latestDefinitionText ?? recentRecord.observationText}
                 </p>

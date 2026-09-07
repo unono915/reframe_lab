@@ -27,7 +27,8 @@ function TrainingRouteSync() {
   const router = useRouter();
   const params = useParams<{ sessionId: string }>();
   const searchParams = useSearchParams();
-  const { status, snapshot, errorMessage, isSoloMode, enableSoloMode } = useTrainingSession();
+  const { status, snapshot, errorMessage, isSoloMode, enableSoloMode } =
+    useTrainingSession();
 
   /**
    * `?solo=1`로 들어오면 이 세션을 "혼자 해보기"로 표시한다 (P1-6 전이 프로브).

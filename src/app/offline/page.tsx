@@ -22,7 +22,12 @@ export default function OfflinePage() {
             내용은 이 기기에 남아 있어요.
           </p>
           <Stack gap={2} className="w-full">
-            <Button type="button" variant="primary" fullWidth onClick={() => location.reload()}>
+            <Button
+              type="button"
+              variant="primary"
+              fullWidth
+              onClick={() => location.reload()}
+            >
               다시 시도
             </Button>
             <LinkButton href="/" variant="tertiary" fullWidth>

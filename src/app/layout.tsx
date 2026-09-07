@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { SerwistProvider } from "@serwist/turbopack/react";
+import { AppUpdateBanner } from "@/features/pwa/AppUpdateBanner";
 import { nanumSquareRound } from "@/styles/fonts";
 import "./globals.css";
 
@@ -51,6 +52,7 @@ export default function RootLayout({
           disable={process.env.NODE_ENV === "development"}
         >
           {children}
+          <AppUpdateBanner />
         </SerwistProvider>
       </body>
     </html>

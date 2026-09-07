@@ -8,6 +8,7 @@ import {
   STAGE_LABELS,
   STAGE_ORDER,
   STAGE_RATIONALE,
+  sessionStatusLabel,
   TOTAL_ACTIVE_STAGES,
 } from "@/domain/training/stages";
 
@@ -105,5 +106,44 @@ describe("stageRationale", () => {
   it("재정의 단계는 고착 경향을 명시적으로 알려준다", () => {
     // Einstellung 연구: 편향의 존재를 알려주기만 해도 고착이 유의하게 줄었다.
     expect(STAGE_RATIONALE.reframing).toContain("고정");
+  });
+});
+
+describe("sessionStatusLabel", () => {
+  it("완료·보류·중단을 각각 구분해 보여준다", () => {
+    expect(sessionStatusLabel("completed")).toBe("완료");
+    expect(sessionStatusLabel("paused")).toBe("보류 중");
+    expect(sessionStatusLabel("abandoned")).toBe("중단됨");
+  });
+
+  it("진행 중인 세션은 어느 단계인지까지 알려준다", () => {
+    expect(sessionStatusLabel("questioning")).toBe("진행 중 · 질문");
+    expect(sessionStatusLabel("feedback")).toBe("진행 중 · 돌아보기");
+  });
+
+  /**
+   * Phase 5 완료 조건: "연속 기록이 끊겨도 비난·실패 표현 없음". 중단된 기록을
+   * "포기"·"실패"로 부르지 않는 것은 문구 취향이 아니라 요구사항이다.
+   */
+  it("어떤 상태도 사용자를 실패로 규정하지 않는다", () => {
+    const blaming = ["실패", "포기", "미완", "중도"];
+    for (const status of ["completed", "paused", "abandoned", "observation", "feedback"] as const) {
+      const label = sessionStatusLabel(status);
+      for (const word of blaming) {
+        expect(label, `${status} → "${label}"`).not.toContain(word);
+      }
+    }
+  });
+});
+
+describe("stageRationale", () => {
+  it("활성 단계마다 왜 하는지 한 줄을 준다 (P0-3 명시적 교육)", () => {
+    for (const stage of STAGE_ORDER) {
+      expect(stageRationale(stage), stage).toBeTruthy();
+    }
+  });
+
+  it("시작 전에는 설명할 단계가 없다", () => {
+    expect(stageRationale("not_started")).toBeNull();
   });
 });

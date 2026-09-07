@@ -4,7 +4,7 @@ import type { CoachInteraction, Stage } from "@/domain/types";
 import { hasMinimalUserInput } from "@/domain/training/requirements";
 import { buildCoachContext } from "@/lib/ai/context";
 import { getFallbackQuestion } from "@/lib/ai/fallback";
-import { isUnretryableAiError } from "@/lib/ai/errors";
+import { describeAiFailure, isUnretryableAiError } from "@/lib/ai/errors";
 import { runCoachGuardrails } from "@/lib/ai/guardrails";
 import type { CoachOutput } from "@/lib/ai/provider";
 import { getActiveCoachProvider } from "@/lib/ai/providers";
@@ -32,18 +32,28 @@ async function getValidatedCoachOutput(
   const provider = getActiveCoachProvider();
   const context = { stage, hintLevel, userText, recentQuestions };
 
+  // 마지막 시도가 왜 실패했는지를 기록에 남긴다. 예전에는 전부
+  // `guardrail_or_schema_failed` 하나였는데, 그러면 fallback이 늘어도 **프롬프트를
+  // 고쳐야 하는지 모델이 흔들리는지** 구분할 수 없다. 이 값이 나중에 코칭 품질을
+  // 판단할 유일한 근거다.
+  let lastFailure = "no_attempt";
+
   for (let attempt = 0; attempt < 2; attempt += 1) {
     let raw: CoachOutput | undefined;
     try {
       raw = await provider.getCoachResponse(context);
     } catch (error) {
+      lastFailure = describeAiFailure(error);
       // 타임아웃은 다시 걸어도 같은 시간을 또 쓸 뿐이다 — 규칙 기반 fallback 질문으로
       // 바로 넘어가는 편이 사용자에게 훨씬 낫다(lib/ai/errors.ts).
       if (isUnretryableAiError(error)) break;
       continue;
     }
     const parsed = coachOutputSchema.safeParse(raw);
-    if (!parsed.success) continue;
+    if (!parsed.success) {
+      lastFailure = "schema_invalid";
+      continue;
+    }
 
     const guardrail = runCoachGuardrails(parsed.data, {
       currentStage: stage,
@@ -53,6 +63,9 @@ async function getValidatedCoachOutput(
     if (guardrail.ok) {
       return { output: guardrail.output, status: "ok" };
     }
+    // 어느 검사가 걸렸는지까지 남긴다 — "해결책 제안"이 잦으면 프롬프트 문제이고,
+    // "반복 질문"이 잦으면 컨텍스트 구성 문제다. 대응이 서로 다르다.
+    lastFailure = `guardrail:${guardrail.violations.join(",")}`;
   }
 
   return {
@@ -68,7 +81,7 @@ async function getValidatedCoachOutput(
       safetyFlags: [],
     },
     status: "fallback",
-    errorCode: "guardrail_or_schema_failed",
+    errorCode: lastFailure,
   };
 }
 

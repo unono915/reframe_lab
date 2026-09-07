@@ -39,3 +39,17 @@ export class AiRejectedError extends Error {
 export function isUnretryableAiError(error: unknown): boolean {
   return error instanceof AiTimeoutError || error instanceof AiRejectedError;
 }
+
+/**
+ * 제공자 호출이 던진 예외를 기록용 코드 한 단어로 바꾼다.
+ *
+ * `coach_interactions.error_code`·`ai_feedbacks.error_code`에 그대로 들어간다.
+ * 지금까지 모든 실패가 `guardrail_or_schema_failed` 하나로 뭉뚱그려져 있어서,
+ * fallback이 늘어도 **프롬프트를 고쳐야 하는지 모델이 흔들리는지 구분할 수 없었다.**
+ * 나중에 이 값을 세어보는 것이 이 앱에서 AI 코칭 품질을 판단할 유일한 근거다.
+ */
+export function describeAiFailure(error: unknown): string {
+  if (error instanceof AiTimeoutError) return "provider_timeout";
+  if (error instanceof AiRejectedError) return `provider_rejected_${error.status}`;
+  return "provider_error";
+}

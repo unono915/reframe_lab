@@ -619,6 +619,29 @@ CSP 위반은 테스트를 실패시키지 않고 조용히 글꼴이 대체되�
 
 ---
 
+### AI가 왜 fallback으로 떨어졌는지 알 방법이 없었다
+
+`coach_interactions.error_code`에 들어가는 값이 늘 `guardrail_or_schema_failed`
+하나였다. 그래서 fallback 비율이 올라가도 **프롬프트를 고쳐야 하는지, 모델이
+흔들리는지, 제공자가 거절하는지**를 구분할 수 없다. 대응이 서로 전혀 다른데도.
+
+정작 `runCoachGuardrails`는 이미 위반 코드 배열을 돌려주고 있었다 — 라우트가 그걸
+버리고 있었을 뿐이다. 이제 마지막 시도의 실패 원인을 그대로 남긴다:
+`provider_timeout` / `provider_rejected_401` / `schema_invalid` /
+`guardrail:solution_suggested,repeated_question` 같은 식이다. "해결책 제안"이 잦으면
+프롬프트 문제이고 "반복 질문"이 잦으면 컨텍스트 구성 문제다.
+
+피드백 경로는 더 나빴다 — **실패해도 아무 기록이 남지 않았다.** coach와 달리 저장
+자체를 하지 않기 때문이다. 실패한 시도를 `ai_feedbacks`에 넣지는 않는다(그 표의 행은
+사용자에게 보이는 내용이라 실패 기록으로 오염시키면 안 된다). 대신 원인을 서버
+로그에 남긴다.
+
+> **왜 지금 이걸 했나.** 지표가 없으면 "AI 코칭이 좋은가"는 인상으로만 답하게 된다.
+> 실 데이터를 세어보려 했더니 `coach_interactions`에 두 행뿐이었고(E2E가 세션을
+> 지운다) 그나마 원인이 전부 같은 코드였다. **판단할 근거를 만드는 것이 먼저다.**
+
+---
+
 ### 검증
 
 typecheck·lint·단위 333개 통과(신규 17개: `useMutationAction` 5, offset 경계 1,

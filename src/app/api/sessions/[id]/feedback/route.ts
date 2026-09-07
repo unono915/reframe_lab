@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import type { AIFeedback } from "@/domain/types";
 import { hasMinimalUserInput } from "@/domain/training/requirements";
-import { isUnretryableAiError } from "@/lib/ai/errors";
+import { describeAiFailure, isUnretryableAiError } from "@/lib/ai/errors";
 import { runFeedbackGuardrails } from "@/lib/ai/guardrails";
 import type { FeedbackOutput } from "@/lib/ai/provider";
 import { getActiveCoachProvider } from "@/lib/ai/providers";
@@ -68,25 +68,41 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const provider = getActiveCoachProvider();
     let validated = null as ReturnType<typeof feedbackOutputSchema.safeParse> | null;
 
+    // 실패한 시도는 `ai_feedbacks`에 남기지 않는다 — 그 표의 행은 사용자에게 보이는
+    // 내용이라 실패 기록으로 오염시키면 안 된다. 대신 서버 로그에 원인을 남긴다.
+    // 이게 없으면 피드백이 반복해서 실패해도 **아무 흔적이 남지 않는다**(coach와
+    // 달리 이 경로는 저장 자체를 하지 않는다).
+    let lastFailure = "no_attempt";
+
     for (let attempt = 0; attempt < 2; attempt += 1) {
       let raw: FeedbackOutput | undefined;
       try {
         raw = await provider.getFeedback({ definitionText: latest.text, supportingText });
       } catch (error) {
+        lastFailure = describeAiFailure(error);
         // 타임아웃은 다시 걸어도 같은 시간을 또 쓸 뿐이다 — 사용자를 두 배로 기다리게
         // 하지 않고 바로 자기 점검 경로로 넘긴다(lib/ai/errors.ts).
         if (isUnretryableAiError(error)) break;
         continue;
       }
       const parsedOutput = feedbackOutputSchema.safeParse(raw);
-      if (!parsedOutput.success) continue;
-      if (runFeedbackGuardrails(parsedOutput.data, supportingText).ok) {
+      if (!parsedOutput.success) {
+        lastFailure = "schema_invalid";
+        continue;
+      }
+      const guardrail = runFeedbackGuardrails(parsedOutput.data, supportingText);
+      if (guardrail.ok) {
         validated = parsedOutput;
         break;
       }
+      // 어느 검사가 걸렸는지까지 남긴다 — 대응이 서로 다르다.
+      lastFailure = `guardrail:${guardrail.violations.join(",")}`;
     }
 
     if (!validated || !validated.success) {
+      console.error(
+        `[feedback] fallback provider=${provider.provider} model=${provider.model} cause=${lastFailure}`,
+      );
       return apiError(
         "internal_error",
         "지금은 AI 피드백을 만들 수 없어요. 아래 자기 점검으로 완료할 수 있어요.",

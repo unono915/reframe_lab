@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { AiRejectedError, AiTimeoutError, isUnretryableAiError } from "@/lib/ai/errors";
+import {
+  AiRejectedError,
+  AiTimeoutError,
+  describeAiFailure,
+  isUnretryableAiError,
+} from "@/lib/ai/errors";
 
 /**
  * 재시도 정책의 회귀 테스트. 원래 Route Handler는 `catch { continue; }`로 모든
@@ -44,5 +49,31 @@ describe("AiRejectedError", () => {
     expect(error.status).toBe(429);
     expect(error.message).toContain("429");
     expect(error).toBeInstanceOf(Error);
+  });
+});
+
+describe("describeAiFailure", () => {
+  /**
+   * 이 문자열은 `coach_interactions.error_code`에 그대로 저장된다. 지금까지는 모든
+   * 실패가 `guardrail_or_schema_failed` 하나였고, 그래서 fallback이 늘어도 프롬프트
+   * 문제인지 모델이 흔들린 것인지 구분할 수 없었다. 나중에 이 값을 세어보는 것이
+   * 코칭 품질을 판단할 유일한 근거라 원인이 서로 섞이면 안 된다.
+   */
+  it("원인마다 다른 코드를 준다", () => {
+    expect(describeAiFailure(new AiTimeoutError(20_000))).toBe("provider_timeout");
+    expect(describeAiFailure(new AiRejectedError(429))).toBe("provider_rejected_429");
+    expect(describeAiFailure(new AiRejectedError(401))).toBe("provider_rejected_401");
+    expect(describeAiFailure(new Error("소켓이 끊김"))).toBe("provider_error");
+  });
+
+  it("Error가 아닌 값이 던져져도 코드를 만들어낸다", () => {
+    expect(describeAiFailure("문자열이 throw됨")).toBe("provider_error");
+    expect(describeAiFailure(undefined)).toBe("provider_error");
+  });
+
+  it("상태 코드가 다르면 코드도 다르다 — 401(키)과 429(한도)는 대응이 다르다", () => {
+    expect(describeAiFailure(new AiRejectedError(401))).not.toBe(
+      describeAiFailure(new AiRejectedError(429)),
+    );
   });
 });

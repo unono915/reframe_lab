@@ -38,7 +38,10 @@ export interface SessionRepository {
    * 반환하지 않는 이유는 `SessionSummary` 주석 참고 — 구현체는 세션 수와 무관하게
    * 고정된 개수의 쿼리만 써야 한다(세션마다 조회하면 N+1이 된다).
    */
-  listSessionSummariesForUser(userId: string, limit?: number): Promise<SessionSummary[]>;
+  listSessionSummariesForUser(
+    userId: string,
+    options?: { limit?: number; offset?: number },
+  ): Promise<SessionSummary[]>;
 }
 
 export interface TemplateRepository {

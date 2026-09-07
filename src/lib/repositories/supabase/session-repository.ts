@@ -259,14 +259,14 @@ export function createSupabaseSessionRepository(
      */
     async listSessionSummariesForUser(
       userId: string,
-      limit = 100,
+      { limit = 100, offset = 0 }: { limit?: number; offset?: number } = {},
     ): Promise<SessionSummary[]> {
       const { data: sessionRows, error } = await client
         .from("training_sessions")
         .select("id, training_date, status, template_id, origin_session_id, ai_call_count")
         .eq("user_id", userId)
         .order("started_at", { ascending: false })
-        .limit(limit);
+        .range(offset, offset + limit - 1);
       if (error) throw error;
       if (!sessionRows || sessionRows.length === 0) return [];
 

@@ -131,13 +131,13 @@ export function createMemorySessionRepository(): SessionRepository {
 
     async listSessionSummariesForUser(
       userId: string,
-      limit = 100,
+      { limit = 100, offset = 0 }: { limit?: number; offset?: number } = {},
     ): Promise<SessionSummary[]> {
       const db = await getDB();
       const forUser = await db.getAllFromIndex(STORE_NAME, "byUser", userId);
       return forUser
         .sort((a, b) => b.session.startedAt.localeCompare(a.session.startedAt))
-        .slice(0, limit)
+        .slice(offset, offset + limit)
         .map(toSummary);
     },
   };

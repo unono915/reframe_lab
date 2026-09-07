@@ -170,10 +170,42 @@ describe("createMemorySessionRepository", () => {
       clientGeneratedId: "c2",
     });
 
-    const listed = await repo.listSessionSummariesForUser(userId, 10);
+    const listed = await repo.listSessionSummariesForUser(userId, { limit: 10 });
     expect(listed).toHaveLength(2);
     expect(listed[0]?.id).toBe(second.session.id);
     expect(listed.map((s) => s.id)).toContain(first.session.id);
+  });
+
+  it("listSessionSummariesForUser는 offset으로 이어받는다 — 경계에서 빠뜨리거나 겹치지 않는다", async () => {
+    const userId = uniqueUserId();
+    const ids: string[] = [];
+    for (let i = 0; i < 5; i += 1) {
+      const created = await repo.createSession({
+        userId,
+        templateId: `template-${i}`,
+        trainingDate: "2026-08-15",
+        timezone: "Asia/Seoul",
+        clientGeneratedId: `c${i}`,
+      });
+      ids.push(created.session.id);
+      // 활성 세션은 사용자당 1개라, 다음 세션을 만들려면 앞 세션을 닫아야 한다.
+      await repo.saveSnapshot({
+        ...created,
+        session: { ...created.session, status: "completed" },
+      });
+      await new Promise((resolve) => setTimeout(resolve, 2));
+    }
+    const newestFirst = [...ids].reverse();
+
+    const page1 = await repo.listSessionSummariesForUser(userId, { limit: 2, offset: 0 });
+    const page2 = await repo.listSessionSummariesForUser(userId, { limit: 2, offset: 2 });
+    const page3 = await repo.listSessionSummariesForUser(userId, { limit: 2, offset: 4 });
+
+    expect(page1.map((s) => s.id)).toEqual(newestFirst.slice(0, 2));
+    expect(page2.map((s) => s.id)).toEqual(newestFirst.slice(2, 4));
+    expect(page3.map((s) => s.id)).toEqual(newestFirst.slice(4));
+    // 끝을 넘어선 offset은 오류가 아니라 빈 목록이다 — "더 보기"가 마지막에 멈추는 근거.
+    expect(await repo.listSessionSummariesForUser(userId, { limit: 2, offset: 5 })).toEqual([]);
   });
 
   it("listSessionSummariesForUser derives Growth 집계 필드를 스냅샷에서 정확히 뽑는다", async () => {
@@ -222,7 +254,7 @@ describe("createMemorySessionRepository", () => {
       ],
     });
 
-    const [summary] = await repo.listSessionSummariesForUser(userId, 10);
+    const [summary] = await repo.listSessionSummariesForUser(userId, { limit: 10 });
     expect(summary?.observationText).toBe("관찰 문장");
     // 최신 버전(v2)을 골라야 한다 — 배열 순서가 아니라 versionNumber 기준.
     expect(summary?.latestDefinitionText).toBe("고쳐 쓴 정의");

@@ -13,10 +13,16 @@ import { fetchJson } from "@/lib/fetch-json";
  * 관찰 첫 문장·상태를 한 Row에 보여준다. Empty State는 "기록이 없다"에서 끝내지
  * 않고 오늘의 훈련으로 연결한다.
  */
+interface HistoryPageData {
+  sessions: SessionSummary[];
+  hasMore: boolean;
+  nextOffset: number | null;
+}
+
 /** setState를 하지 않는 순수 로더 — 화면 상태 적용은 호출자가 한다. */
 async function fetchHistory() {
   const [history, templates] = await Promise.all([
-    fetchJson<{ sessions: SessionSummary[] }>("/api/history"),
+    fetchJson<HistoryPageData>("/api/history"),
     fetchJson<{ templates: TrainingTemplate[] }>("/api/templates"),
   ]);
   return { history, templates };
@@ -27,6 +33,11 @@ export default function HistoryPage() {
   const [sessions, setSessions] = useState<SessionSummary[] | null>(null);
   const [templates, setTemplates] = useState<TrainingTemplate[]>([]);
   const [error, setError] = useState<string | null>(null);
+  /** 다음 페이지의 시작 위치. null이면 더 없다는 뜻이다. */
+  const [nextOffset, setNextOffset] = useState<number | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  /** 이어 받기 실패는 이미 보고 있는 목록을 지우지 않는다 — 그 자리에서만 알린다. */
+  const [moreError, setMoreError] = useState<string | null>(null);
 
   const apply = useCallback(({ history, templates }: Awaited<ReturnType<typeof fetchHistory>>) => {
     if (!history.ok) {
@@ -34,6 +45,7 @@ export default function HistoryPage() {
       return;
     }
     setSessions(history.data.sessions);
+    setNextOffset(history.data.nextOffset);
     // 템플릿은 보조 정보(렌즈 이름)라 실패해도 목록 자체는 보여준다.
     if (templates.ok) setTemplates(templates.data.templates);
   }, []);
@@ -51,6 +63,26 @@ export default function HistoryPage() {
   function handleRetry() {
     setError(null);
     void fetchHistory().then(apply);
+  }
+
+  function handleLoadMore() {
+    if (nextOffset === null || loadingMore) return;
+    setLoadingMore(true);
+    setMoreError(null);
+    void fetchJson<HistoryPageData>(`/api/history?offset=${nextOffset}`).then((result) => {
+      setLoadingMore(false);
+      if (!result.ok) {
+        setMoreError(result.message);
+        return;
+      }
+      // offset 기준 페이지라, 사이에 새 기록이 생기면 경계가 한 칸 밀려 같은 기록이
+      // 두 번 올 수 있다. React key 중복과 중복 표시를 막기 위해 id로 걸러 붙인다.
+      setSessions((prev) => {
+        const seen = new Set((prev ?? []).map((s) => s.id));
+        return [...(prev ?? []), ...result.data.sessions.filter((s) => !seen.has(s.id))];
+      });
+      setNextOffset(result.data.nextOffset);
+    });
   }
 
   const templateById = useMemo(
@@ -134,8 +166,31 @@ export default function HistoryPage() {
               </Stack>
             </Stack>
           ))}
+
+          {nextOffset !== null && (
+            <Stack gap={2}>
+              {moreError && (
+                <p role="alert" className="text-caption text-danger">
+                  {moreError}
+                </p>
+              )}
+              <Button
+                type="button"
+                variant="secondary"
+                fullWidth
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+              >
+                {loadingMore ? "불러오는 중이에요…" : "지난 기록 더 보기"}
+              </Button>
+            </Stack>
+          )}
         </Stack>
       )}
+      {/* 목록에 새로 붙은 기록을 스크린 리더에도 알린다(포커스는 옮기지 않는다). */}
+      <p aria-live="polite" className="sr-only">
+        {sessions.length > 0 ? `기록 ${sessions.length}건을 보고 있어요.` : ""}
+      </p>
     </main>
   );
 }

@@ -24,6 +24,14 @@ function isPublicPath(pathname: string): boolean {
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
 
+  /**
+   * 프록시(Vercel) 뒤에서는 원 요청의 프로토콜이 `x-forwarded-proto`로만 남는다 —
+   * `request.nextUrl.protocol`은 내부 홉의 값일 수 있어 그것만 보면 안 된다.
+   */
+  const isHttps =
+    request.headers.get("x-forwarded-proto") === "https" ||
+    request.nextUrl.protocol === "https:";
+
   // non-null 단언(`!`)은 런타임에 아무 것도 막지 못한다 — 실제로 값이 없는 배포에서
   // undefined가 그대로 SDK까지 흘러가 매 요청이 500으로 죽었다(env.ts 주석 참고).
   const { url, anonKey } = requireSupabaseEnv();
@@ -42,7 +50,17 @@ export async function updateSession(request: NextRequest) {
           }
           response = NextResponse.next({ request });
           for (const { name, value, options } of cookiesToSet) {
-            response.cookies.set(name, value, options);
+            // HTTPS로 들어온 요청에는 세션 쿠키에 Secure를 못 박는다 — 평문 연결로
+            // 세션 토큰이 나가는 경로를 아예 닫는다.
+            //
+            // NODE_ENV로 판단하지 않는 이유: E2E는 프로덕션 빌드를 http://localhost로
+            // 띄운다. NODE_ENV=production만 보고 Secure를 켜면 브라우저가 쿠키를
+            // 저장하지 않아 로그인 자체가 막힌다. 실제 프로토콜로 판단해야 맞다.
+            //
+            // 이 쿠키는 `httpOnly`가 아니다 — @supabase/ssr의 브라우저 클라이언트가
+            // 같은 쿠키에서 세션을 읽어야 하기 때문에 구조상 불가피하다. 그래서
+            // XSS를 막는 쪽(CSP, HTML 주입 지점 없음)이 이 앱에서 특히 중요하다.
+            response.cookies.set(name, value, { ...options, secure: isHttps || options?.secure });
           }
         },
       },

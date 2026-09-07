@@ -55,6 +55,12 @@ const nextConfig: NextConfig = {
         source: "/:path*",
         headers: [
           { key: "Content-Security-Policy", value: CONTENT_SECURITY_POLICY },
+          // HTTP로 접속하는 브라우저는 이 헤더를 무시하므로 로컬 개발에는 영향이 없다.
+          // preload는 넣지 않는다 — 되돌리기 어려운 등록이라 사용자가 결정할 일이다.
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=63072000; includeSubDomains",
+          },
           // MIME 스니핑을 막는다 — 사용자가 올린 적 없는 앱이지만, 잘못된
           // Content-Type이 스크립트로 해석되는 경로를 아예 닫아둔다.
           { key: "X-Content-Type-Options", value: "nosniff" },

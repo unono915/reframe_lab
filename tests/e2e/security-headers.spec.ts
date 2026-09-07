@@ -14,6 +14,8 @@ const EXPECTED = {
   "x-content-type-options": "nosniff",
   "x-frame-options": "DENY",
   "referrer-policy": "strict-origin-when-cross-origin",
+  // preload는 일부러 넣지 않는다 — 되돌리기 어려운 등록이라 사용자가 결정할 일이다.
+  "strict-transport-security": "max-age=63072000; includeSubDomains",
 } as const;
 
 /** CSP에서 이것들이 빠지면 막고 있던 공격이 다시 열린다. */
@@ -38,7 +40,7 @@ for (const path of ["/auth/login", "/api/templates"]) {
       expect(headers[key], `${path} 의 ${key}`).toBe(value);
     }
 
-    const csp = headers["content-security-policy"];
+    const csp = headers["content-security-policy"] ?? "";
     expect(csp, `${path} 에 CSP가 없다`).toBeTruthy();
     for (const directive of REQUIRED_CSP_DIRECTIVES) {
       expect(csp).toContain(directive);

@@ -74,6 +74,20 @@ export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (!user && !isPublicPath(pathname)) {
+    // API 요청은 리다이렉트하지 않는다. 예전에는 화면과 똑같이 로그인 페이지로
+    // 307을 보냈는데, `fetch`는 그 리다이렉트를 따라가 **HTML을 받는다** — 호출부의
+    // `response.json()`이 깨지면서 사용자에게는 "잠시 문제가 생겼어요"만 뜨고,
+    // 정작 필요한 행동(다시 로그인)은 어디에도 안내되지 않았다. 오래 열어두는
+    // iOS standalone PWA에서 토큰이 만료되면 정확히 그 상태로 갇힌다.
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json(
+        {
+          errorCode: "unauthorized",
+          message: "로그인이 풀렸어요. 다시 로그인해주세요.",
+        },
+        { status: 401 },
+      );
+    }
     const loginUrl = new URL("/auth/login", request.url);
     loginUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(loginUrl);

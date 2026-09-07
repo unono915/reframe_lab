@@ -39,7 +39,7 @@ import {
   type DraftRecord,
 } from "@/lib/persistence/drafts";
 import { findConflictingDrafts } from "@/lib/persistence/reconciliation";
-import { toDisplayMessage, UserFacingError } from "@/lib/fetch-json";
+import { handleUnauthorized, toDisplayMessage, UserFacingError } from "@/lib/fetch-json";
 import type { MutateAction } from "@/lib/schemas/mutate-actions";
 import type {
   explorationPromptKeySchema,
@@ -219,6 +219,9 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
         // 실패 응답도 서버가 함께 보내주는 최신 스냅샷은 반영한다(§7.3 409 규약).
         if (body?.snapshot) commit(body.snapshot);
 
+        // 세션이 풀렸으면 재시도로 풀리지 않는다 — 로그인 화면으로 보낸다.
+        handleUnauthorized(response.status, body);
+
         if (!response.ok || !body) {
           // 예전에는 여기서 옛 스냅샷을 그대로 돌려줬다 — 호출자 입장에서 "아무것도
           // 바뀌지 않은 성공"과 구분이 되지 않아, 저장이 실패했는데도 곧바로
@@ -275,6 +278,7 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
         if (returnedSnapshot) commit(returnedSnapshot);
 
         if (!response.ok) {
+          handleUnauthorized(response.status, body);
           return { ok: false, message: body.message ?? "지금은 이 동작을 할 수 없어요." };
         }
 

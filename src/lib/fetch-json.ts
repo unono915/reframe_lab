@@ -54,6 +54,38 @@ export function toUserMessage(error: unknown): string {
   return UNKNOWN_ERROR_MESSAGE;
 }
 
+/**
+ * 세션이 풀렸을 때 로그인 화면으로 보낸다.
+ *
+ * 낮은 층의 fetch 헬퍼가 화면을 이동시키는 것은 조심스러운 일이지만, 대안은 모든
+ * 호출부가 401을 각자 처리하는 것이고 그러면 한 곳만 빠뜨려도 사용자는 "잠시 문제가
+ * 생겼어요" 앞에 갇힌다 — 재시도 버튼을 아무리 눌러도 달라지지 않는 화면이다.
+ * 401은 재시도로 풀리지 않는 유일한 실패라 여기서 한 번에 처리하는 편이 맞다.
+ *
+ * `next`에 지금 경로를 담아 로그인 후 원래 자리로 돌아오게 한다.
+ */
+function goToLogin(): void {
+  if (typeof window === "undefined") return;
+  if (window.location.pathname.startsWith("/auth/")) return;
+  const next = `${window.location.pathname}${window.location.search}`;
+  // 일부러 **전체 새로고침**으로 이동한다. router.push는 클라이언트 상태를 그대로
+  // 안고 가는데, 지금 그 상태는 사라진 세션으로 만든 스냅샷·캐시라 남겨두면 안 된다.
+  // (그리고 이 함수는 컴포넌트가 아니라 훅을 쓸 수 없다.)
+  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+  window.location.assign(`/auth/login?next=${encodeURIComponent(next)}`);
+}
+
+/**
+ * 세션 만료 응답이면 로그인 화면으로 보내고 true를 돌려준다. 서버는 항상
+ * `unauthorized` 코드와 401을 함께 보낸다(lib/errors.ts, supabase/middleware.ts).
+ */
+export function handleUnauthorized(status: number, body: unknown): boolean {
+  const unauthorized =
+    status === 401 || (body as ApiErrorBody | null)?.errorCode === "unauthorized";
+  if (unauthorized) goToLogin();
+  return unauthorized;
+}
+
 export async function fetchJson<T>(
   input: string,
   init?: RequestInit,
@@ -78,6 +110,8 @@ export async function fetchJson<T>(
 
   if (!response.ok) {
     const message = (body as ApiErrorBody | null)?.message;
+    // 세션이 풀린 경우는 재시도로 풀리지 않는다 — 로그인 화면으로 보낸다.
+    handleUnauthorized(response.status, body);
     return { ok: false, message: message ?? UNKNOWN_ERROR_MESSAGE };
   }
   if (body === null) return { ok: false, message: UNKNOWN_ERROR_MESSAGE };

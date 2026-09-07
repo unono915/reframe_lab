@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { SerwistProvider } from "@serwist/turbopack/react";
-import { AppUpdateBanner } from "@/features/pwa/AppUpdateBanner";
+import { AppBanners } from "@/features/pwa/AppBanners";
 import { nanumSquareRound } from "@/styles/fonts";
 import "./globals.css";
 
@@ -51,8 +51,9 @@ export default function RootLayout({
           reloadOnOnline={false}
           disable={process.env.NODE_ENV === "development"}
         >
+          {/* 배너를 먼저 그린다 — 문서 흐름에서 화면 위에 붙어야 아무것도 가리지 않는다. */}
+          <AppBanners />
           {children}
-          <AppUpdateBanner />
         </SerwistProvider>
       </body>
     </html>

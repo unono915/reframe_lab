@@ -36,6 +36,8 @@
   --color-warning-bg: #fbf3df;
   --color-danger: #a64040;
   --color-danger-bg: #fceeee;
+  --color-offline: #5e655f;
+  --color-offline-bg: #eee8de;
 
   /* ---- Typography: DESIGN.md §5.1, §5.2 ----
    * next/font/local이 --font-nanum-square-round 변수를 layout.tsx에서 주입한다 (§14-K).

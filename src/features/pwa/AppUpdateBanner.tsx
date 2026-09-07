@@ -55,11 +55,10 @@ export function AppUpdateBanner() {
   if (!updateReady || dismissed) return null;
 
   return (
-    <div
-      role="status"
-      className="pb-safe pointer-events-none fixed inset-x-0 bottom-0 z-50 px-5 pb-4"
-    >
-      <Card variant="neutral" className="pointer-events-auto mx-auto max-w-[640px]">
+    // 화면 하단 고정 배치는 `AppBanners`가 맡는다 — 오프라인 배너와 겹치지 않게
+    // 한 줄로 쌓기 위해서다. 여기서는 카드 자체만 그린다.
+    <div role="status" className="mx-auto mt-2 w-full max-w-[640px]">
+      <Card variant="neutral" className="pointer-events-auto">
         <Stack gap={3}>
           <p className="text-body text-ink">
             새 버전이 준비됐어요. 작성 중인 내용을 저장한 뒤 업데이트할 수 있어요.

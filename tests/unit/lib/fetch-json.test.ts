@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   fetchJson,
+  handleUnauthorized,
   NETWORK_ERROR_MESSAGE,
   toDisplayMessage,
   toUserMessage,
@@ -107,5 +108,70 @@ describe("toDisplayMessage — 우리 메시지와 브라우저 예외를 가른
     const message = toDisplayMessage(new Error("QuotaExceededError: storage full"));
     expect(message).not.toContain("QuotaExceeded");
     expect(message).toContain("작성한 내용은 그대로 있어요");
+  });
+});
+
+/**
+ * 세션이 풀렸을 때의 이동. 예전에는 미인증 API 요청이 로그인 **HTML**로
+ * 리다이렉트돼서, `response.json()`이 깨지고 사용자에게는 "잠시 문제가 생겼어요"만
+ * 남았다 — 재시도해도 달라지지 않는 화면이다.
+ *
+ * 여기서 잠그는 것은 세 가지다: ① 401이면 실제로 이동한다 ② 원래 자리를 `next`에
+ * 담는다 ③ **로그인 화면에서는 다시 이동하지 않는다**(리다이렉트 루프는 세션이 풀린
+ * 사용자를 앱에서 완전히 내보낸다).
+ */
+describe("handleUnauthorized", () => {
+  function stubLocation(pathname: string, search = "") {
+    const assign = vi.fn();
+    vi.stubGlobal("window", {
+      location: { pathname, search, assign },
+    });
+    return assign;
+  }
+
+  it("401이면 로그인으로 보내고, 원래 자리를 next에 담는다", () => {
+    const assign = stubLocation("/history", "?offset=50");
+    expect(handleUnauthorized(401, null)).toBe(true);
+    expect(assign).toHaveBeenCalledWith(
+      `/auth/login?next=${encodeURIComponent("/history?offset=50")}`,
+    );
+  });
+
+  it("상태가 401이 아니어도 errorCode가 unauthorized면 같은 처리를 한다", () => {
+    const assign = stubLocation("/growth");
+    expect(handleUnauthorized(500, { errorCode: "unauthorized" })).toBe(true);
+    expect(assign).toHaveBeenCalledOnce();
+  });
+
+  it("이미 로그인 화면이면 다시 이동하지 않는다 — 리다이렉트 루프 방지", () => {
+    const assign = stubLocation("/auth/login", "?next=%2Fhistory");
+    expect(handleUnauthorized(401, null)).toBe(true);
+    expect(assign).not.toHaveBeenCalled();
+  });
+
+  it("401이 아닌 실패는 화면을 옮기지 않는다", () => {
+    const assign = stubLocation("/history");
+    expect(handleUnauthorized(500, { errorCode: "internal_error" })).toBe(false);
+    expect(handleUnauthorized(404, null)).toBe(false);
+    expect(assign).not.toHaveBeenCalled();
+  });
+});
+
+describe("fetchJson — 세션 만료", () => {
+  it("401을 받으면 서버 문구를 보여주면서 로그인으로 보낸다", async () => {
+    const assign = vi.fn();
+    vi.stubGlobal("window", { location: { pathname: "/history", search: "", assign } });
+    stubFetch(
+      async () =>
+        new Response(
+          JSON.stringify({ errorCode: "unauthorized", message: "로그인이 풀렸어요." }),
+          { status: 401 },
+        ),
+    );
+
+    const result = await fetchJson("/api/history");
+    expect(result).toEqual({ ok: false, message: "로그인이 풀렸어요." });
+    // 메시지만 보여주고 끝내면 사용자는 재시도 버튼 앞에 갇힌다.
+    expect(assign).toHaveBeenCalledOnce();
   });
 });

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Button, Card, Field, Stack, Textarea } from "@/components/ui";
+import { INPUT_LIMITS } from "@/lib/schemas/stage-input";
 import { EXCEPTION_PROMPT_KEYS } from "@/domain/training/requirements";
 import { StageShell } from "../StageShell";
 import { useTrainingSession } from "../TrainingSessionProvider";
@@ -70,6 +71,8 @@ export function ObservationStage() {
               쓴 내용이 있을 때만 보여준다(디바운스 500ms 뒤 실제로 기록된다).
             */
             helperText={rawText.trim() ? "이 기기에 저장했어요." : undefined}
+
+            counter={{ current: rawText.length, max: INPUT_LIMITS.observationRawText }}
           >
             <Textarea
               value={rawText}

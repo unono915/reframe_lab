@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Field, Textarea } from "@/components/ui";
+import { INPUT_LIMITS } from "@/lib/schemas/stage-input";
 import { StageShell } from "../StageShell";
 import { useTrainingSession } from "../TrainingSessionProvider";
 
@@ -39,6 +40,8 @@ export function DefinitionStage() {
           쓴 내용이 있을 때만 보여준다(디바운스 500ms 뒤 실제로 기록된다).
         */
         helperText={text.trim() ? "이 기기에 저장했어요." : undefined}
+
+        counter={{ current: text.length, max: INPUT_LIMITS.definitionText }}
       >
         <Textarea
           value={text}

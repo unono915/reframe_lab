@@ -81,7 +81,9 @@ export function FeedbackStage() {
   const assessmentSaved = hasCompletedSelfAssessment(snapshot);
   const showForm = !assessmentSaved || editing;
   const currentAnswers = showForm ? draft : readSelfAssessment(snapshot);
-  const allAnswered = SELF_CHECK_ITEMS.every((item) => currentAnswers[item.key] !== undefined);
+  const allAnswered = SELF_CHECK_ITEMS.every(
+    (item) => currentAnswers[item.key] !== undefined,
+  );
 
   const comparisons = compareSelfAssessmentWithAi(snapshot, latestFeedback);
   const overconfident = overconfidentDimensions(comparisons);
@@ -152,7 +154,8 @@ export function FeedbackStage() {
         {latestVersion && (
           <Card variant="paper">
             <p className="text-label font-bold text-brand-strong">
-              현재의 문제 정의 {latestVersion.versionNumber > 1 && `(v${latestVersion.versionNumber})`}
+              현재의 문제 정의{" "}
+              {latestVersion.versionNumber > 1 && `(v${latestVersion.versionNumber})`}
             </p>
             <p className="text-body-lg text-ink">{latestVersion.text}</p>
           </Card>
@@ -166,22 +169,28 @@ export function FeedbackStage() {
           <Card variant="paper">
             <p className="text-label font-bold text-brand-strong">다른 사례로 견줘보기</p>
             <p className="mt-1 text-caption text-text-secondary">
-              내 문장을 고치라는 뜻이 아니에요. 같은 종류의 장면을 다른 사람이 어떻게
-              옮겨 적었는지 보는 것뿐이에요.
+              내 문장을 고치라는 뜻이 아니에요. 같은 종류의 장면을 다른 사람이 어떻게 옮겨
+              적었는지 보는 것뿐이에요.
             </p>
             <Stack gap={3}>
               <div className="mt-3">
-                <p className="text-caption font-bold text-text-secondary">처음 떠오르기 쉬운 문장</p>
+                <p className="text-caption font-bold text-text-secondary">
+                  처음 떠오르기 쉬운 문장
+                </p>
                 <p className="text-body text-text-secondary line-through decoration-border">
                   {example.weak}
                 </p>
               </div>
               <div>
-                <p className="text-caption font-bold text-text-secondary">옮겨 적은 문장</p>
+                <p className="text-caption font-bold text-text-secondary">
+                  옮겨 적은 문장
+                </p>
                 <p className="text-body text-ink">{example.strong}</p>
               </div>
               <div>
-                <p className="text-caption font-bold text-text-secondary">무엇이 달라졌나</p>
+                <p className="text-caption font-bold text-text-secondary">
+                  무엇이 달라졌나
+                </p>
                 <p className="text-body text-ink">{example.whatChanged}</p>
               </div>
             </Stack>
@@ -198,7 +207,10 @@ export function FeedbackStage() {
           {showForm ? (
             <Stack gap={3}>
               {SELF_CHECK_ITEMS.map((item) => (
-                <fieldset key={item.key} className="rounded-control bg-warm-gray px-4 py-3">
+                <fieldset
+                  key={item.key}
+                  className="rounded-control bg-warm-gray px-4 py-3"
+                >
                   {/*
                     legend는 기본적으로 fieldset 테두리 위에 얹혀 렌더돼, 질문이 패널
                     밖으로 빠져나가 선택지와 분리돼 보였다(질문이 두 줄이면 겹치기까지 했다).
@@ -275,10 +287,14 @@ export function FeedbackStage() {
                   </Badge>
                 </div>
               ))}
-              <Button type="button" variant="tertiary" onClick={() => {
-                setDraft(readSelfAssessment(snapshot));
-                setEditing(true);
-              }}>
+              <Button
+                type="button"
+                variant="tertiary"
+                onClick={() => {
+                  setDraft(readSelfAssessment(snapshot));
+                  setEditing(true);
+                }}
+              >
                 다시 점검하기
               </Button>
             </Stack>
@@ -314,7 +330,8 @@ export function FeedbackStage() {
                       ))}
                     </ul>
                     <p className="mt-2 text-caption text-text-secondary">
-                      틀렸다는 뜻은 아니에요. 내 머릿속에는 있지만 문장에는 안 적힌 것일 수 있어요.
+                      틀렸다는 뜻은 아니에요. 내 머릿속에는 있지만 문장에는 안 적힌 것일
+                      수 있어요.
                     </p>
                   </Card>
                 )}
@@ -329,7 +346,9 @@ export function FeedbackStage() {
                 </Card>
                 <Card variant="coach">
                   <p className="text-label font-bold text-brand-strong">아직 가설인 점</p>
-                  <p className="text-body text-ink">{latestFeedback.unverifiedAssumption}</p>
+                  <p className="text-body text-ink">
+                    {latestFeedback.unverifiedAssumption}
+                  </p>
                 </Card>
                 <p className="text-body-lg text-ink">{latestFeedback.nextQuestion}</p>
               </Stack>
@@ -405,7 +424,11 @@ export function FeedbackStage() {
                   >
                     {reviseAction.pending ? "기록하는 중이에요…" : "새 버전으로 기록하기"}
                   </Button>
-                  <Button type="button" variant="tertiary" onClick={() => setRevising(false)}>
+                  <Button
+                    type="button"
+                    variant="tertiary"
+                    onClick={() => setRevising(false)}
+                  >
                     그만두기
                   </Button>
                 </div>

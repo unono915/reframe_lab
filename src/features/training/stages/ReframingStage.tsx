@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { PerspectiveLens } from "@/domain/types";
 import { Button, Card, Field, Stack, Textarea } from "@/components/ui";
+import { INPUT_LIMITS } from "@/lib/schemas/stage-input";
 import { EXCEPTION_PROMPT_KEYS } from "@/domain/training/requirements";
 import { InlineError } from "../InlineError";
 import { StageShell } from "../StageShell";
@@ -134,7 +135,11 @@ export function ReframingStage() {
               <p className="text-body text-ink">{r.text}</p>
             </Card>
           ))}
-          <Field id="reframe-text" label="대안 문제 프레임">
+          <Field
+            id="reframe-text"
+            label="대안 문제 프레임"
+            counter={{ current: reframeText.length, max: INPUT_LIMITS.reframeText }}
+          >
             <Textarea
               value={reframeText}
               onChange={(e) => setReframeText(e.target.value)}

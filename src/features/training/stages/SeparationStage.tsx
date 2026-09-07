@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { ItemType } from "@/domain/types";
 import { Button, Card, Field, Stack, Textarea } from "@/components/ui";
+import { INPUT_LIMITS } from "@/lib/schemas/stage-input";
 import { EXCEPTION_PROMPT_KEYS } from "@/domain/training/requirements";
 import { InlineError } from "../InlineError";
 import { StageShell } from "../StageShell";
@@ -109,7 +110,11 @@ export function SeparationStage() {
           <InlineError message={confirmAction.error} />
         </Stack>
 
-        <Field id="separation-item-text" label="추가할 항목">
+        <Field
+          id="separation-item-text"
+          label="추가할 항목"
+          counter={{ current: text.length, max: INPUT_LIMITS.observationItemText }}
+        >
           <Textarea
             value={text}
             onChange={(e) => setText(e.target.value)}

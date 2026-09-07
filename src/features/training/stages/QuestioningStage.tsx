@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { HintLevel } from "@/domain/types";
 import { Button, Card, Field, Stack, Textarea } from "@/components/ui";
+import { INPUT_LIMITS } from "@/lib/schemas/stage-input";
 import { EXCEPTION_PROMPT_KEYS } from "@/domain/training/requirements";
 import { CoachLoadingCard } from "../CoachLoadingCard";
 import { InlineError } from "../InlineError";
@@ -151,7 +152,11 @@ export function QuestioningStage() {
           <InlineError message={priorityAction.error} />
         </Stack>
 
-        <Field id="question-text" label="새 질문">
+        <Field
+          id="question-text"
+          label="새 질문"
+          counter={{ current: text.length, max: INPUT_LIMITS.questionText }}
+        >
           <Textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
@@ -162,7 +167,12 @@ export function QuestioningStage() {
         <Stack direction="row" gap={2}>
           {/* 혼자 하기로 한 세션에서는 AI 도움을 아예 노출하지 않는다 (P1-6). */}
           {!isSoloMode && (
-            <Button type="button" variant="tertiary" onClick={handleHint} disabled={hintPending}>
+            <Button
+              type="button"
+              variant="tertiary"
+              onClick={handleHint}
+              disabled={hintPending}
+            >
               {hintPending ? "힌트 요청 중" : hintError ? "다시 시도" : "힌트 보기"}
             </Button>
           )}

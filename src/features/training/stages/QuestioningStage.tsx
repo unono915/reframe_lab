@@ -4,8 +4,10 @@ import { useState } from "react";
 import type { HintLevel } from "@/domain/types";
 import { Button, Card, Field, Stack, Textarea } from "@/components/ui";
 import { EXCEPTION_PROMPT_KEYS } from "@/domain/training/requirements";
+import { InlineError } from "../InlineError";
 import { StageShell } from "../StageShell";
 import { useTrainingSession } from "../TrainingSessionProvider";
+import { useMutationAction } from "../useMutationAction";
 
 export function QuestioningStage() {
   const {
@@ -26,6 +28,8 @@ export function QuestioningStage() {
   const [prioritySelectionId, setPrioritySelectionId] = useState<string | null>(null);
   const [priorityReason, setPriorityReason] = useState("");
   const [exceptionReason, setExceptionReason] = useState("");
+  const addAction = useMutationAction();
+  const priorityAction = useMutationAction();
 
   if (!snapshot) return null;
   const questions = snapshot.questions.filter((q) => q.authorType === "user");
@@ -39,7 +43,12 @@ export function QuestioningStage() {
     const submittedHintLevel = hintLevel;
     setText("");
     setHintText(null);
-    await addQuestion({ text: submitted }, submittedHintLevel);
+    // 저장이 실패하면 방금 지운 질문을 되돌린다 — 그러지 않으면 사용자가 쓴 문장이
+    // 서버에도 화면에도 남지 않는다(원칙 7).
+    await addAction.run(
+      () => addQuestion({ text: submitted }, submittedHintLevel),
+      () => setText(submitted),
+    );
   }
 
   async function handleHint() {
@@ -60,7 +69,14 @@ export function QuestioningStage() {
     const submitted = priorityReason;
     setPrioritySelectionId(null);
     setPriorityReason("");
-    await markPriorityQuestion(questionId, submitted);
+    // 실패하면 고르던 화면과 적어둔 이유를 그대로 되살린다.
+    await priorityAction.run(
+      () => markPriorityQuestion(questionId, submitted),
+      () => {
+        setPrioritySelectionId(questionId);
+        setPriorityReason(submitted);
+      },
+    );
   }
 
   async function handlePrimaryAction() {
@@ -131,6 +147,7 @@ export function QuestioningStage() {
               </Stack>
             </Card>
           ))}
+          <InlineError message={priorityAction.error} />
         </Stack>
 
         <Field id="question-text" label="새 질문">
@@ -148,10 +165,16 @@ export function QuestioningStage() {
               {hintPending ? "힌트 요청 중" : hintError ? "다시 시도" : "힌트 보기"}
             </Button>
           )}
-          <Button type="button" variant="primary" onClick={handleAdd}>
-            질문 추가하기
+          <Button
+            type="button"
+            variant="primary"
+            onClick={handleAdd}
+            disabled={addAction.pending}
+          >
+            {addAction.pending ? "추가하는 중이에요…" : "질문 추가하기"}
           </Button>
         </Stack>
+        <InlineError message={addAction.error} />
         {hintError && (
           <p role="alert" className="text-caption font-bold text-danger">
             {hintError}

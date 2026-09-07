@@ -155,10 +155,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       createdAt: new Date().toISOString(),
     };
 
+    // AI 호출은 최대 20초 걸린다. 그 사이 다른 기기·탭이 이 세션을 바꿨다면, 호출
+    // 전에 읽어둔 `current`를 그대로 저장하는 순간 그 변경이 사라진다 —
+    // `save_training_session_snapshot`은 낙관적 잠금 없이 자식 테이블을 지우고 다시
+    // 넣는 방식이라(0003 마이그레이션), 오래된 스냅샷을 쓰면 그 뒤 저장된 질문·프레임이
+    // 통째로 지워진다(원칙 7). 우리가 더하는 것은 코치 상호작용 1건과 호출 수 1 증가뿐이므로,
+    // 저장 직전에 최신 스냅샷을 다시 읽어 거기에만 얹는다.
+    const fresh = (await loadOwnedSnapshot(repos, sessionId, userId)) ?? current;
     const saved = await repos.sessionRepository.saveSnapshot({
-      ...current,
-      coachInteractions: [...current.coachInteractions, interaction],
-      session: { ...current.session, aiCallCount: current.session.aiCallCount + 1 },
+      ...fresh,
+      coachInteractions: [...fresh.coachInteractions, interaction],
+      session: { ...fresh.session, aiCallCount: fresh.session.aiCallCount + 1 },
     });
 
     return NextResponse.json({ question: output.question, snapshot: saved });

@@ -4,8 +4,10 @@ import { useState } from "react";
 import type { PerspectiveLens } from "@/domain/types";
 import { Button, Card, Field, Stack, Textarea } from "@/components/ui";
 import { EXCEPTION_PROMPT_KEYS } from "@/domain/training/requirements";
+import { InlineError } from "../InlineError";
 import { StageShell } from "../StageShell";
 import { useTrainingSession } from "../TrainingSessionProvider";
+import { useMutationAction } from "../useMutationAction";
 
 const LENS_LABELS: Record<PerspectiveLens, string> = {
   stakeholder: "사람 바꾸기",
@@ -30,6 +32,8 @@ export function ReframingStage() {
   const [perspectiveText, setPerspectiveText] = useState("");
   const [reframeText, setReframeText] = useState("");
   const [exceptionReason, setExceptionReason] = useState("");
+  const perspectiveAction = useMutationAction();
+  const reframeAction = useMutationAction();
 
   if (!snapshot) return null;
   const reframes = snapshot.reframes.filter((r) => r.authorType === "user");
@@ -40,14 +44,21 @@ export function ReframingStage() {
     if (!perspectiveText.trim()) return;
     const submitted = perspectiveText;
     setPerspectiveText("");
-    await addPerspective({ lensType: perspectiveLens, content: submitted });
+    // 저장이 실패하면 지운 입력을 되돌린다 — 그러지 않으면 서버에도 화면에도 남지 않는다(원칙 7).
+    await perspectiveAction.run(
+      () => addPerspective({ lensType: perspectiveLens, content: submitted }),
+      () => setPerspectiveText(submitted),
+    );
   }
 
   async function handleAddReframe() {
     if (!reframeText.trim()) return;
     const submitted = reframeText;
     setReframeText("");
-    await addReframe({ text: submitted }, 0);
+    await reframeAction.run(
+      () => addReframe({ text: submitted }, 0),
+      () => setReframeText(submitted),
+    );
   }
 
   async function handlePrimaryAction() {
@@ -94,9 +105,15 @@ export function ReframingStage() {
               rows={2}
             />
           </Field>
-          <Button type="button" variant="tertiary" onClick={handleAddPerspective}>
-            발견한 내용 추가하기
+          <Button
+            type="button"
+            variant="tertiary"
+            onClick={handleAddPerspective}
+            disabled={perspectiveAction.pending}
+          >
+            {perspectiveAction.pending ? "추가하는 중이에요…" : "발견한 내용 추가하기"}
           </Button>
+          <InlineError message={perspectiveAction.error} />
           {snapshot.perspectives.map((p) => (
             <Card key={p.id} variant="cream">
               <p className="text-caption font-bold text-brand-strong">
@@ -125,9 +142,15 @@ export function ReframingStage() {
               rows={2}
             />
           </Field>
-          <Button type="button" variant="tertiary" onClick={handleAddReframe}>
-            프레임 추가하기
+          <Button
+            type="button"
+            variant="tertiary"
+            onClick={handleAddReframe}
+            disabled={reframeAction.pending}
+          >
+            {reframeAction.pending ? "추가하는 중이에요…" : "프레임 추가하기"}
           </Button>
+          <InlineError message={reframeAction.error} />
         </Stack>
 
         {reframes.length === 1 && (

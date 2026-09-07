@@ -12,8 +12,10 @@ import {
   readSelfAssessment,
   type SelfAssessmentStatus,
 } from "@/domain/training/self-assessment";
+import { InlineError } from "../InlineError";
 import { StageShell } from "../StageShell";
 import { useTrainingSession } from "../TrainingSessionProvider";
+import { useMutationAction } from "../useMutationAction";
 
 type AssessmentDraft = Partial<Record<SelfCheckKey, SelfAssessmentStatus>>;
 
@@ -49,7 +51,8 @@ export function FeedbackStage() {
   const [feedbackError, setFeedbackError] = useState<string | null>(null);
   const [draft, setDraft] = useState<AssessmentDraft>({});
   const [editing, setEditing] = useState(false);
-  const [savePending, setSavePending] = useState(false);
+  const assessmentAction = useMutationAction();
+  const reviseAction = useMutationAction();
 
   const [revising, setRevising] = useState(false);
   const [revisedText, setRevisedText] = useState("");
@@ -84,14 +87,17 @@ export function FeedbackStage() {
 
   async function handleSaveAssessment() {
     if (!allAnswered) return;
-    setSavePending(true);
-    await completeSelfCheck(
-      SELF_CHECK_ITEMS.map((item) => ({
-        key: item.key,
-        status: draft[item.key] as SelfAssessmentStatus,
-      })),
+    // 폼을 닫는 것은 서버가 확인해준 뒤에만 한다 — 예전에는 실패해도 닫혀서,
+    // 답한 내용이 저장된 것처럼 보였다(원칙 7).
+    const ok = await assessmentAction.run(() =>
+      completeSelfCheck(
+        SELF_CHECK_ITEMS.map((item) => ({
+          key: item.key,
+          status: draft[item.key] as SelfAssessmentStatus,
+        })),
+      ),
     );
-    setSavePending(false);
+    if (!ok) return;
     setEditing(false);
   }
 
@@ -114,7 +120,13 @@ export function FeedbackStage() {
       return;
     }
     setReviseError(null);
-    await submitDefinition({ text: revisedText, changeReason });
+    // 실패했는데도 폼을 닫고 두 입력을 비우면 고쳐 쓴 문장과 그 이유가 통째로 사라진다.
+    const ok = await reviseAction.run(() =>
+      submitDefinition({ text: revisedText, changeReason }),
+    );
+    // 실패 문구는 reviseAction.error가 들고 있다 — 같은 렌더에서 읽으면 아직
+    // 갱신 전 값이라 여기서 옮겨 담지 않고 화면에서 둘을 합쳐 보여준다.
+    if (!ok) return;
     setRevising(false);
     setRevisedText("");
     setChangeReason("");
@@ -242,11 +254,12 @@ export function FeedbackStage() {
               <Button
                 type="button"
                 variant="secondary"
-                disabled={!allAnswered || savePending}
+                disabled={!allAnswered || assessmentAction.pending}
                 onClick={handleSaveAssessment}
               >
-                {savePending ? "저장 중" : "점검 마치기"}
+                {assessmentAction.pending ? "저장 중" : "점검 마치기"}
               </Button>
+              <InlineError message={assessmentAction.error} />
             </Stack>
           ) : (
             <Stack gap={2}>
@@ -376,14 +389,16 @@ export function FeedbackStage() {
                     placeholder="예: 영향을 받는 사람을 빼놓고 썼다는 걸 알았어요."
                   />
                 </Field>
-                {reviseError && (
-                  <p role="alert" className="text-caption font-bold text-danger">
-                    {reviseError}
-                  </p>
-                )}
+                {/* 입력 검증 실패(reviseError)와 저장 실패(reviseAction.error)를 한 자리에서 알린다. */}
+                <InlineError message={reviseError ?? reviseAction.error} />
                 <div className="flex gap-2">
-                  <Button type="button" variant="secondary" onClick={handleSubmitRevision}>
-                    새 버전으로 기록하기
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={handleSubmitRevision}
+                    disabled={reviseAction.pending}
+                  >
+                    {reviseAction.pending ? "기록하는 중이에요…" : "새 버전으로 기록하기"}
                   </Button>
                   <Button type="button" variant="tertiary" onClick={() => setRevising(false)}>
                     그만두기

@@ -4,8 +4,10 @@ import { useState } from "react";
 import type { ItemType } from "@/domain/types";
 import { Button, Card, Field, Stack, Textarea } from "@/components/ui";
 import { EXCEPTION_PROMPT_KEYS } from "@/domain/training/requirements";
+import { InlineError } from "../InlineError";
 import { StageShell } from "../StageShell";
 import { useTrainingSession } from "../TrainingSessionProvider";
+import { useMutationAction } from "../useMutationAction";
 
 const ITEM_TYPE_LABELS: Record<ItemType, string> = {
   fact: "확인한 사실",
@@ -27,6 +29,8 @@ export function SeparationStage() {
   const [text, setText] = useState("");
   const [type, setType] = useState<ItemType>("fact");
   const [exceptionReason, setExceptionReason] = useState("");
+  const addAction = useMutationAction();
+  const confirmAction = useMutationAction();
 
   if (!snapshot) return null;
   const items = snapshot.observationItems;
@@ -39,7 +43,12 @@ export function SeparationStage() {
     // 값을 지워버린다(연속 추가 시 실제로 재현됨).
     const submitted = text;
     setText("");
-    await addObservationItem({ text: submitted, type });
+    // 저장이 실패하면 방금 지운 입력을 되돌린다 — 그러지 않으면 사용자가 쓴 문장이
+    // 서버에도 화면에도 남지 않는다(원칙 7).
+    await addAction.run(
+      () => addObservationItem({ text: submitted, type }),
+      () => setText(submitted),
+    );
   }
 
   async function handlePrimaryAction() {
@@ -86,13 +95,18 @@ export function SeparationStage() {
                 <Button
                   type="button"
                   variant={item.userConfirmed ? "secondary" : "primary"}
-                  onClick={() => confirmObservationItem(item.id, !item.userConfirmed)}
+                  onClick={() =>
+                    void confirmAction.run(() =>
+                      confirmObservationItem(item.id, !item.userConfirmed),
+                    )
+                  }
                 >
                   {item.userConfirmed ? "확인됨" : "확인"}
                 </Button>
               </Stack>
             </Card>
           ))}
+          <InlineError message={confirmAction.error} />
         </Stack>
 
         <Field id="separation-item-text" label="추가할 항목">
@@ -115,9 +129,15 @@ export function SeparationStage() {
             </Button>
           ))}
         </Stack>
-        <Button type="button" variant="tertiary" onClick={handleAdd}>
-          항목 추가하기
+        <Button
+          type="button"
+          variant="tertiary"
+          onClick={handleAdd}
+          disabled={addAction.pending}
+        >
+          {addAction.pending ? "추가하는 중이에요…" : "항목 추가하기"}
         </Button>
+        <InlineError message={addAction.error} />
 
         {confirmedCount === 0 && (
           <Field

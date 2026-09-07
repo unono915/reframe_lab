@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Badge, Button, Card, LinkButton, Stack } from "@/components/ui";
+import { Badge, Button, Card, LinkButton, PageState, Stack } from "@/components/ui";
 import type {
   AuthorType,
   TrainingSessionSnapshot,
   TrainingTemplate,
 } from "@/domain/types";
 import { sessionStatusLabel } from "@/domain/training/stages";
+import { fetchJson } from "@/lib/fetch-json";
 
 function detectTimezone(): string {
   try {
@@ -30,6 +31,23 @@ function AuthorBadge({ authorType }: { authorType: AuthorType }) {
 }
 
 /**
+ * setState를 하지 않는 순수 로더 — 화면 상태 적용은 호출자가 한다.
+ *
+ * 예전에는 `fetch(...).then((res) => res.json())`을 그대로 썼다. 응답이 2xx가
+ * 아니거나 본문이 비면 `json()`이 SyntaxError를 던지는데, 그 자리에 catch가 없어
+ * `Promise.all`이 통째로 reject되고 `setLoading(false)`에 닿지 못했다 — 화면이
+ * "기록을 불러오고 있어요"에서 영영 멈췄다. Home·History·Growth에서 이미 같은
+ * 이유로 고쳤던 버그가 이 화면에만 남아 있었다.
+ */
+async function loadResult(sessionId: string) {
+  const [session, templates] = await Promise.all([
+    fetchJson<{ snapshot: TrainingSessionSnapshot | null }>(`/api/sessions/${sessionId}`),
+    fetchJson<{ templates: TrainingTemplate[] }>("/api/templates"),
+  ]);
+  return { session, templates };
+}
+
+/**
  * S-04 Result 겸 S-06 Record Detail / Revisit (DESIGN.md §10.4, §10.6). 막 완료한
  * 직후에도, History에서 나중에 다시 열어도 같은 화면을 쓴다 — 세션 id만 있으면
  * 언제든 같은 내용을 재구성할 수 있어서(스냅샷이 유일한 진실) 두 화면을 굳이
@@ -45,82 +63,106 @@ export default function ResultPage() {
   const [revisitPending, setRevisitPending] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deletePending, setDeletePending] = useState(false);
+  /** 두 동작의 실패 안내를 함께 쓴다 — 한 번에 하나만 진행되므로 섞일 일이 없다. */
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [pageError, setPageError] = useState<string | null>(null);
+
+  const apply = useCallback((result: Awaited<ReturnType<typeof loadResult>>) => {
+    if (!result.session.ok) {
+      // 404("요청한 세션을 찾을 수 없어요")와 서버 오류·네트워크 단절을 구분해서
+      // 보여준다 — 예전에는 셋 다 "기록을 찾을 수 없어요"로 뭉뚱그렸다.
+      setPageError(result.session.message);
+      setLoading(false);
+      return;
+    }
+    const loaded = result.session.data.snapshot;
+    setSnapshot(loaded);
+    // 렌즈 이름은 보조 정보라 실패해도 본문은 보여준다.
+    if (loaded && result.templates.ok) {
+      setTemplate(
+        result.templates.data.templates.find((t) => t.id === loaded.session.templateId) ?? null,
+      );
+    }
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
-    void Promise.all([
-      fetch(`/api/sessions/${params.sessionId}`).then((res) =>
-        res.ok ? res.json() : { snapshot: null },
-      ) as Promise<{ snapshot: TrainingSessionSnapshot | null }>,
-      fetch("/api/templates").then((res) => res.json()) as Promise<{
-        templates: TrainingTemplate[];
-      }>,
-    ]).then(([sessionBody, templatesBody]) => {
+    void loadResult(params.sessionId).then((result) => {
       if (cancelled) return;
-      setSnapshot(sessionBody.snapshot);
-      if (sessionBody.snapshot) {
-        setTemplate(
-          templatesBody.templates.find((t) => t.id === sessionBody.snapshot?.session.templateId) ??
-            null,
-        );
-      }
-      setLoading(false);
-
-      const originId = sessionBody.snapshot?.session.originSessionId;
-      if (originId) {
-        void fetch(`/api/sessions/${originId}`)
-          .then((res) => (res.ok ? res.json() : { snapshot: null }))
-          .then((body: { snapshot: TrainingSessionSnapshot | null }) => {
-            if (!cancelled) setOriginSnapshot(body.snapshot);
-          });
-      }
+      apply(result);
+      // 원본 기록은 Revisit 세션에서만 쓰는 보조 카드라, 실패해도 본문은 그대로 보여준다.
+      const originId = result.session.ok ? result.session.data.snapshot?.session.originSessionId : null;
+      if (!originId) return;
+      void fetchJson<{ snapshot: TrainingSessionSnapshot | null }>(
+        `/api/sessions/${originId}`,
+      ).then((origin) => {
+        if (!cancelled && origin.ok) setOriginSnapshot(origin.data.snapshot);
+      });
     });
     return () => {
       cancelled = true;
     };
-  }, [params.sessionId]);
+  }, [params.sessionId, apply]);
+
+  function handleRetry() {
+    setPageError(null);
+    setLoading(true);
+    void loadResult(params.sessionId).then(apply);
+  }
 
   async function handleRevisit() {
     if (!snapshot) return;
     setRevisitPending(true);
-    const res = await fetch(`/api/sessions/${snapshot.session.id}/revisit`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        timezone: detectTimezone(),
-        clientRequestId: crypto.randomUUID(),
-      }),
-    });
+    setActionError(null);
+    // 예전에는 `await fetch`를 그대로 썼다 — 실패하면 조용히 return해서 버튼이
+    // 아무 반응 없이 끝났고, 오프라인이면 fetch가 reject하는 바람에
+    // setRevisitPending(false)에 닿지 못해 **버튼이 영영 "만드는 중"에 멈췄다.**
+    // fetchJson은 절대 throw하지 않고 실패를 한국어 문장으로 돌려준다.
+    const result = await fetchJson<{ snapshot: TrainingSessionSnapshot }>(
+      `/api/sessions/${snapshot.session.id}/revisit`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          timezone: detectTimezone(),
+          clientRequestId: crypto.randomUUID(),
+        }),
+      },
+    );
     setRevisitPending(false);
-    if (!res.ok) return;
-    const body = (await res.json()) as { snapshot: TrainingSessionSnapshot };
-    router.push(`/training/${body.snapshot.session.id}`);
+    if (!result.ok) {
+      setActionError(result.message);
+      return;
+    }
+    router.push(`/training/${result.data.snapshot.session.id}`);
   }
 
   async function handleDelete() {
     if (!snapshot) return;
     setDeletePending(true);
-    const res = await fetch(`/api/sessions/${snapshot.session.id}`, { method: "DELETE" });
+    setActionError(null);
+    // 되돌릴 수 없는 동작이라 "됐는지 안 됐는지 모르겠다"가 특히 나쁘다.
+    const result = await fetchJson(`/api/sessions/${snapshot.session.id}`, {
+      method: "DELETE",
+    });
     setDeletePending(false);
-    if (res.ok || res.status === 204) {
-      router.push("/history");
+    if (!result.ok) {
+      setActionError(result.message);
+      return;
     }
+    router.push("/history");
   }
 
+  if (pageError) {
+    return <PageState status="error" message={pageError} onRetry={handleRetry} />;
+  }
   if (loading) {
-    return (
-      <main className="flex min-h-dvh items-center justify-center px-5">
-        <p className="text-body text-text-secondary">기록을 불러오고 있어요.</p>
-      </main>
-    );
+    return <PageState status="loading" loadingLabel="기록을 불러오고 있어요." />;
   }
-
   if (!snapshot) {
-    return (
-      <main className="flex min-h-dvh items-center justify-center px-5">
-        <p className="text-body font-bold text-danger">기록을 찾을 수 없어요.</p>
-      </main>
-    );
+    // 서버가 200으로 `snapshot: null`을 준 경우 — 정말 없는 기록이다.
+    return <PageState status="error" message="기록을 찾을 수 없어요." />;
   }
 
   const versions = [...snapshot.problemDefinitionVersions].sort(
@@ -324,6 +366,11 @@ export default function ResultPage() {
       )}
 
       <Stack gap={3}>
+        {actionError && (
+          <p role="alert" className="text-caption font-bold text-danger">
+            {actionError}
+          </p>
+        )}
         <Button type="button" variant="secondary" fullWidth onClick={handleRevisit} disabled={revisitPending}>
           {revisitPending ? "새 기록을 만드는 중" : "이 장면 다시 생각하기"}
         </Button>

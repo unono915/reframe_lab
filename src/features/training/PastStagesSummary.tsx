@@ -4,7 +4,9 @@ import { useState } from "react";
 import type { Stage, TrainingSessionSnapshot } from "@/domain/types";
 import { Badge, Button, Card, Stack, Textarea } from "@/components/ui";
 import { STAGE_ORDER, stageIndex, stageLabel } from "@/domain/training/stages";
+import { InlineError } from "./InlineError";
 import { useTrainingSession } from "./TrainingSessionProvider";
+import { useMutationAction } from "./useMutationAction";
 
 /**
  * DESIGN.md §6.5: "이전 답변은 접힌 Summary로 확인하며, 수정 시 해당 단계부터
@@ -86,14 +88,24 @@ function PastStageRow({
         )[0]?.text ?? "");
   const [text, setText] = useState(initialText);
   const editable = EDITABLE_STAGES.includes(stage);
+  const saveAction = useMutationAction();
 
   async function handleSave() {
     if (!text.trim()) return;
-    if (stage === "observation") {
-      await submitObservation({ rawText: text, contextWhen: undefined, contextWhere: undefined });
-    } else if (stage === "definition") {
-      await submitDefinition({ text, changeReason: "이전 단계로 돌아가 수정함" });
-    }
+    // 폼을 닫고 "수정됨"을 띄우는 것은 **서버가 확인해준 뒤에만** 한다. 예전에는
+    // await 다음 줄에서 무조건 했기 때문에, 저장이 실패해도 화면은 성공처럼 보였다
+    // — 사용자는 고친 문장이 저장된 줄 알고 떠난다(원칙 7).
+    const ok = await saveAction.run(() => {
+      if (stage === "observation") {
+        return submitObservation({
+          rawText: text,
+          contextWhen: undefined,
+          contextWhere: undefined,
+        });
+      }
+      return submitDefinition({ text, changeReason: "이전 단계로 돌아가 수정함" });
+    });
+    if (!ok) return;
     setEditing(false);
     setSaved(true);
   }
@@ -129,8 +141,13 @@ function PastStageRow({
               rows={3}
             />
             <Stack direction="row" gap={2}>
-              <Button type="button" variant="primary" onClick={handleSave}>
-                저장하기
+              <Button
+                type="button"
+                variant="primary"
+                onClick={handleSave}
+                disabled={saveAction.pending}
+              >
+                {saveAction.pending ? "저장하는 중이에요…" : "저장하기"}
               </Button>
               <Button
                 type="button"
@@ -143,6 +160,7 @@ function PastStageRow({
                 취소
               </Button>
             </Stack>
+            <InlineError message={saveAction.error} />
           </Stack>
         ) : (
           <p className="text-body text-ink">{summarize(stage, snapshot)}</p>

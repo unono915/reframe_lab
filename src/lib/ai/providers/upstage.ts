@@ -6,7 +6,7 @@ import type {
   FeedbackOutput,
   FeedbackRequestContext,
 } from "../provider";
-import { AiTimeoutError } from "../errors";
+import { AiRejectedError, AiTimeoutError } from "../errors";
 
 /**
  * Upstage Solar Provider Adapter (§14-D 결정: solar-pro4). `response_format:
@@ -164,6 +164,13 @@ async function callUpstageChat(
     });
 
     if (!response.ok) {
+      // 4xx는 우리가 보낸 요청이 잘못됐거나 한도를 넘은 것이라 같은 요청을 다시
+      // 보내도 답이 같다 — 재시도에 20초를 더 쓰지 않도록 구분해 던진다. 408(요청
+      // 타임아웃)만은 일시적일 수 있어 남긴다. 5xx는 제공자 쪽 일시 장애일 수 있어
+      // 그대로 재시도 대상으로 둔다.
+      if (response.status >= 400 && response.status < 500 && response.status !== 408) {
+        throw new AiRejectedError(response.status);
+      }
       throw new Error(`Upstage API 오류 (${response.status})`);
     }
 

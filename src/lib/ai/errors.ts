@@ -17,10 +17,25 @@ export class AiTimeoutError extends Error {
 }
 
 /**
+ * 제공자가 4xx로 거절한 경우. 같은 요청을 그대로 다시 보내면 같은 답이 온다 —
+ * 잘못된 API Key(401·403), 스키마·파라미터 오류(400), 호출량 초과(429)가 여기 해당한다.
+ * 5xx는 포함하지 않는다: 제공자 쪽 일시 장애는 재시도로 회복되는 경우가 있다.
+ */
+export class AiRejectedError extends Error {
+  readonly status: number;
+
+  constructor(status: number) {
+    super(`AI 제공자가 요청을 거절했습니다 (${status}).`);
+    this.name = "AiRejectedError";
+    this.status = status;
+  }
+}
+
+/**
  * 재시도해도 결과가 달라질 가망이 없는 실패인가.
- * 지금은 타임아웃만 해당한다 — 네트워크 단절도 후보지만, 일시적 끊김은 재시도로
- * 회복되는 경우가 있어 굳이 막지 않는다.
+ * 타임아웃과 제공자의 4xx 거절이 해당한다 — 네트워크 단절도 후보지만, 일시적 끊김은
+ * 재시도로 회복되는 경우가 있어 굳이 막지 않는다.
  */
 export function isUnretryableAiError(error: unknown): boolean {
-  return error instanceof AiTimeoutError;
+  return error instanceof AiTimeoutError || error instanceof AiRejectedError;
 }

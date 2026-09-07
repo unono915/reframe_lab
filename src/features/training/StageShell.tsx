@@ -12,7 +12,7 @@ import {
   TOTAL_ACTIVE_STAGES,
 } from "@/domain/training/stages";
 import { describeRemainingRequirement } from "@/domain/training/requirements";
-import { toUserMessage } from "@/lib/fetch-json";
+import { toDisplayMessage } from "@/lib/fetch-json";
 import { PastStagesSummary } from "./PastStagesSummary";
 import { useTrainingSession } from "./TrainingSessionProvider";
 
@@ -101,7 +101,7 @@ export function StageShell({
       // err.message를 그대로 쓰면 브라우저가 던진 영어 원문("Failed to fetch")이
       // 한국어 화면에 노출된다 — 실제로 네트워크를 끊고 재현했다. 사용자에게는
       // 무엇이 실패했고 입력이 남아있다는 사실만 한국어로 전한다.
-      setError(toUserMessage(err));
+      setError(toDisplayMessage(err));
     } finally {
       setPending(false);
     }

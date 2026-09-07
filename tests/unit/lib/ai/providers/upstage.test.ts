@@ -57,6 +57,31 @@ describe("upstageCoachProvider — 실패를 구분 가능한 형태로 던진�
     expect(isUnretryableAiError(error)).toBe(false);
   });
 
+  it.each([
+    [400, "요청 형식이 틀렸다"],
+    [401, "API Key가 틀렸다"],
+    [429, "호출량을 넘었다"],
+  ])("제공자가 %i로 거절하면 재시도하지 않는다 (%s)", async (status) => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve(new Response("", { status }))),
+    );
+
+    const error = await upstageCoachProvider.getCoachResponse(CONTEXT).catch((e: unknown) => e);
+    // 같은 요청을 그대로 다시 보내도 같은 답이 온다 — 20초를 한 번 더 쓰지 않는다.
+    expect(isUnretryableAiError(error)).toBe(true);
+  });
+
+  it("408(요청 타임아웃)은 일시적일 수 있어 재시도 대상으로 남긴다", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve(new Response("", { status: 408 }))),
+    );
+
+    const error = await upstageCoachProvider.getCoachResponse(CONTEXT).catch((e: unknown) => e);
+    expect(isUnretryableAiError(error)).toBe(false);
+  });
+
   it("응답에 content가 없으면 오류로 알린다 — 조용히 빈 값을 돌려주지 않는다", async () => {
     vi.stubGlobal(
       "fetch",

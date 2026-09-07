@@ -1,4 +1,5 @@
 import { chromium, type FullConfig } from "@playwright/test";
+import { appAlert } from "./helpers/alerts";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -32,8 +33,7 @@ export default async function globalSetup(config: FullConfig) {
     // 실패하면 Playwright는 "waitForURL 타임아웃"만 보여준다 — 정작 화면에는
     // 원인이 적혀 있는데(잘못된 자격증명, 이메일 미인증, Supabase 오류) 그것이
     // 로그에 안 남아 매번 처음부터 다시 조사하게 된다. 화면의 안내를 함께 남긴다.
-    const onScreen = await page
-      .getByRole("alert")
+    const onScreen = await appAlert(page)
       .allInnerTexts()
       .catch(() => [] as string[]);
     await browser.close();

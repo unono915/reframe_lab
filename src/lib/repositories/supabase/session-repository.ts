@@ -47,6 +47,8 @@ import {
 } from "./mappers";
 
 const ACTIVE_STATUS_FILTER = ["completed", "abandoned"];
+/** Postgres unique_violation. 활성 세션 1개 제약과 부딪혔을 때만 본다. */
+const UNIQUE_VIOLATION = "23505";
 
 /**
  * `memory/session-repository.ts`와 동일한 인터페이스의 Supabase 구현. 읽기는 일반
@@ -197,7 +199,22 @@ export function createSupabaseSessionRepository(
         created_at: now,
         updated_at: now,
       });
-      if (error) throw error;
+      if (error) {
+        // 위의 조회와 이 삽입 사이에 다른 요청이 먼저 세션을 만들면 부분 유니크
+        // 인덱스(`training_sessions_one_active_per_user`)가 이쪽을 막는다. 버튼을
+        // 두 번 누르거나 재시도가 겹치면 실제로 일어나고, 그때 사용자에게는
+        // 아무 잘못이 없다 — 이미 만들어진 그 세션이 정답이다.
+        //
+        // 인덱스는 제 역할을 했다(활성 세션은 여전히 하나뿐이다). 빠진 것은 경쟁에서
+        // 진 쪽의 처리였고, 그대로 두면 "오늘의 훈련 시작"이 원인 없이 실패한다.
+        // `createSession`은 원래 멱등하기로 되어 있다(memory 구현의 단위 테스트가
+        // 그 계약을 이미 검증한다).
+        if (error.code === UNIQUE_VIOLATION) {
+          const winner = await getActiveSessionForUser(params.userId);
+          if (winner) return winner;
+        }
+        throw error;
+      }
 
       const snapshot = await getSnapshot(sessionId);
       if (!snapshot) throw new Error("세션 생성 직후 조회에 실패했습니다");

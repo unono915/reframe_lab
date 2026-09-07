@@ -3,12 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Card, cn, PageState, Stack } from "@/components/ui";
-import type { SessionSummary } from "@/domain/types";
-import {
-  computeGrowthMetrics,
-  type GrowthMetrics,
-  type QualityTrendPoint,
-  type TrendShift,
+import type {
+  GrowthMetrics,
+  QualityTrendPoint,
+  TrendShift,
 } from "@/domain/growth/metrics";
 import { fetchJson } from "@/lib/fetch-json";
 
@@ -20,10 +18,6 @@ function detectTimezone(): string {
   }
 }
 
-function todayDateString(timezone: string): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(new Date());
-}
-
 const MIN_SESSIONS_FOR_RHYTHM = 3;
 /** Dot 추이는 최근 것만 보여준다 — 수십 개가 늘어서면 변화를 읽을 수 없다. */
 const MAX_TREND_DOTS = 12;
@@ -33,8 +27,16 @@ const WEEK_LABELS = ["3주 전", "2주 전", "지난주", "이번 주"] as const
 /** 막대 최대 높이(px). 이상치가 있어도 카드를 넘지 않게 하는 상한이다. */
 const BAR_MAX_HEIGHT = 56;
 
+/**
+ * 지표 계산은 서버에서 한다(`/api/growth`). 예전에는 `/api/history`를 그대로 받아
+ * 여기서 계산했는데, History에 페이지네이션이 들어가면서 **아무 표시 없이 분석
+ * 구간이 절반으로 줄었다** — 목록의 페이지 크기와 지표의 관측 구간은 서로 다른
+ * 이유로 정해지는 값이라 한 엔드포인트를 공유하면 안 됐다.
+ */
 function fetchGrowth() {
-  return fetchJson<{ sessions: SessionSummary[] }>("/api/history");
+  return fetchJson<{ metrics: GrowthMetrics; latestSessionId: string | null }>(
+    `/api/growth?timezone=${encodeURIComponent(detectTimezone())}`,
+  );
 }
 
 /**
@@ -58,9 +60,8 @@ export default function GrowthPage() {
       setError(result.message);
       return;
     }
-    const timezone = detectTimezone();
-    setMetrics(computeGrowthMetrics(result.data.sessions, todayDateString(timezone)));
-    setLatestSessionId(result.data.sessions.find((s) => s.status === "completed")?.id ?? null);
+    setMetrics(result.data.metrics);
+    setLatestSessionId(result.data.latestSessionId);
   }, []);
 
   useEffect(() => {

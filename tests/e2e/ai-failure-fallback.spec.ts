@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { appAlert } from "./helpers/alerts";
 import { resetActiveSession } from "./helpers/cleanup";
 import {
   completeSelfAssessment,
@@ -20,6 +21,17 @@ import {
  * 그래서 여기서는 AI 경로를 실제로 죽여놓고 **사용자에게 무엇이든 보이는지**,
  * 그리고 **그래도 완주할 수 있는지**를 확인한다.
  */
+/**
+ * Service Worker를 끄고 돈다. 이 파일의 테스트는 `page.route`로 API 응답을
+ * 바꿔치기해서 실패를 만들어내는데, PWA의 Service Worker가 요청을 먼저 가로채면
+ * Playwright의 라우트 가로채기가 닿지 않는다. Chromium에서는 통과했지만 WebKit
+ * (iOS Safari)에서는 요청이 그대로 서버까지 가서 **실패가 일어나지 않았다** —
+ * 그런데 예전 단언(`toBeVisible()`)은 Next.js의 빈 route announcer에 걸려 통과했기
+ * 때문에 아무도 눈치채지 못했다. 여기서 검증하는 것은 오프라인 캐시가 아니라
+ * 실패 처리라, Service Worker를 빼는 것이 오히려 검증 대상을 좁혀준다.
+ */
+test.use({ serviceWorkers: "block" });
+
 test.skip(
   !process.env.E2E_TEST_EMAIL || !process.env.E2E_TEST_PASSWORD,
   "E2E_TEST_EMAIL/PASSWORD 미설정 — 로그인 필요한 E2E는 건너뜀 (.env.example 참고)",
@@ -59,7 +71,7 @@ test("힌트 요청이 서버 오류로 실패하면 사용자에게 오류가 �
   await page.getByRole("button", { name: "힌트 보기" }).click();
 
   // 침묵하지 않는 것이 핵심이다 — 무엇이 잘못됐는지와 다시 시도할 방법이 보여야 한다.
-  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(appAlert(page)).toHaveText(/\S/);
   await expect(page.getByRole("button", { name: "다시 시도" })).toBeVisible();
 
   // 그리고 세션 자체는 멀쩡해야 한다 — 계속 쓸 수 있다.
@@ -90,7 +102,7 @@ test("서버가 빈 질문을 돌려줘도 화면이 침묵하지 않는다", as
   });
 
   await page.getByRole("button", { name: "힌트 보기" }).click();
-  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(appAlert(page)).toHaveText(/\S/);
 });
 
 test("AI가 완전히 죽어도 7단계를 완주할 수 있다 (원칙 8)", async ({ page }) => {
@@ -107,7 +119,7 @@ test("AI가 완전히 죽어도 7단계를 완주할 수 있다 (원칙 8)", asy
 
   // AI 피드백을 시도해도 실패하지만, 그 실패가 완주를 막지 않는다.
   await page.getByRole("button", { name: "AI 피드백 보기" }).click();
-  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(appAlert(page)).toHaveText(/\S/);
 
   await finishSession(page);
 });

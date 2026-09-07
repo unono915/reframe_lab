@@ -212,9 +212,27 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ clientRequestId: crypto.randomUUID(), mutation }),
         });
-        const body = await parseJsonSafe<{ snapshot: TrainingSessionSnapshot }>(response);
-        if (!response.ok || !body) return current;
-        commit(body.snapshot);
+        const body = await parseJsonSafe<
+          { snapshot: TrainingSessionSnapshot } & Partial<ApiErrorBody>
+        >(response);
+
+        // 실패 응답도 서버가 함께 보내주는 최신 스냅샷은 반영한다(§7.3 409 규약).
+        if (body?.snapshot) commit(body.snapshot);
+
+        if (!response.ok || !body) {
+          // 예전에는 여기서 옛 스냅샷을 그대로 돌려줬다 — 호출자 입장에서 "아무것도
+          // 바뀌지 않은 성공"과 구분이 되지 않아, 저장이 실패했는데도 곧바로
+          // advance()로 넘어갔다. advance()는 로컬 초안을 지우므로 그 순간 사용자의
+          // 입력이 서버에도 기기에도 없게 된다(원칙 7 위반). 실패는 실패로 알린다.
+          // 사용자에게는 한국어 한 문장만 보이지만, 무엇이 실패했는지는 콘솔에 남긴다 —
+          // 그러지 않으면 "저장하지 못했어요"만 보고 원인을 좁힐 방법이 없다.
+          console.error(
+            `[mutate] ${mutation.action} 실패 status=${response.status} bodyParsed=${body !== null}`,
+          );
+          throw new UserFacingError(
+            body?.message ?? "저장하지 못했어요. 잠시 후 다시 시도해주세요.",
+          );
+        }
         return body.snapshot;
       }),
     [enqueue, commit],
@@ -232,8 +250,10 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
         if (!current) return { ok: false, message: "세션이 아직 준비되지 않았습니다." };
 
         if (endpoint === "advance") {
+          // 대기 중인 debounce 저장만 미리 취소한다. 그대로 두면 전환 뒤에 뒤늦게
+          // 발동해 이미 지나간 단계의 초안을 되살린다(E2E로 재현한 경쟁 상태).
+          // 실제 삭제는 서버가 전환을 확정한 뒤에 한다 — 아래 주석 참고.
           debouncedSaveRef.current.cancelPending();
-          await clearSessionDrafts(current.session.id);
         }
 
         const response = await fetch(`/api/sessions/${current.session.id}/${endpoint}`, {
@@ -256,6 +276,19 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
 
         if (!response.ok) {
           return { ok: false, message: body.message ?? "지금은 이 동작을 할 수 없어요." };
+        }
+
+        // 초안 삭제는 여기까지 와야 안전하다. 예전에는 fetch 앞에서 지웠는데, 그
+        // 사이에 서버 저장이 실패하면(예: 이 프로젝트에서 실제로 겪은 JWT 시각 오차
+        // 500) 입력이 서버에도 기기에도 남지 않았다 — 그런데도 화면에는 "작성한
+        // 내용은 그대로 있어요"가 떴다. 정리 실패가 성공한 전환을 오류로 뒤집지는
+        // 않게 감싼다(남은 초안은 다음 성공한 전환에서 정리된다).
+        if (endpoint === "advance") {
+          try {
+            await clearSessionDrafts(current.session.id);
+          } catch {
+            // 무시한다 — 초안이 남는 것은 입력을 잃는 것보다 훨씬 가벼운 문제다.
+          }
         }
         return { ok: true };
       }),

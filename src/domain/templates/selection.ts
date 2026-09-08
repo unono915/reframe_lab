@@ -6,7 +6,36 @@ import type { TrainingTemplate } from "@/domain/types";
  * 기능이라 domain/의 "프레임워크 의존 없음" 원칙을 어기지 않는다.
  */
 export function todayDateString(timezone: string): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(new Date());
+  try {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(new Date());
+  } catch {
+    /*
+      `Intl`은 모르는 시간대를 받으면 `RangeError`를 던진다. 이 값은 브라우저가
+      보고한 것을 그대로 서버까지 들고 온 것이라, 이상한 값이 오는 경로가 실제로
+      있다 — 지문 방지 설정이 켜진 브라우저, 오래된 런타임, 그리고 주소창에서 쿼리를
+      고친 사람.
+
+      던지게 두면 홈·성장·오늘의 렌즈가 **한꺼번에 500으로 죽는다.** 화면에는 "잠시
+      문제가 생겼어요"만 뜨고, 사용자는 자기 브라우저의 시간대 설정이 원인이라는 것을
+      알 방법이 없다. 그래서 라우트들이 이미 쓰고 있는 기본값(UTC)으로 물러난다 —
+      날짜가 하루 어긋날 수는 있어도 앱은 계속 쓸 수 있다.
+    */
+    return new Intl.DateTimeFormat("en-CA", { timeZone: "UTC" }).format(new Date());
+  }
+}
+
+/**
+ * 저장하기 전에 시간대 값을 정리한다. `todayDateString`이 스스로 물러날 수 있어도,
+ * **못 쓰는 값을 DB에 넣어두면 나중에 읽는 쪽이 같은 문제를 다시 겪는다.**
+ */
+export function resolveTimeZone(timezone: string | null | undefined): string {
+  if (!timezone) return "UTC";
+  try {
+    new Intl.DateTimeFormat("en-CA", { timeZone: timezone });
+    return timezone;
+  } catch {
+    return "UTC";
+  }
 }
 
 /** FNV-1a 32bit — 암호학적 용도가 아니라 결정론적 분산에만 쓴다. */

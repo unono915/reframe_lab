@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { todayDateString } from "@/domain/templates/selection";
+import { resolveTimeZone, todayDateString } from "@/domain/templates/selection";
 import { apiError } from "@/lib/errors";
 import {
   createRouteContext,
@@ -30,7 +30,9 @@ export async function POST(
   const parsed = requestSchema.safeParse(json);
   if (!parsed.success)
     return apiError("validation_error", parsed.error.issues[0]?.message);
-  const { timezone, clientRequestId } = parsed.data;
+  const { clientRequestId } = parsed.data;
+  // 저장 전 정리는 세션 생성과 같은 이유다(`api/sessions/route.ts` 주석 참고).
+  const timezone = resolveTimeZone(parsed.data.timezone);
 
   return withIdempotency(supabase, userId, clientRequestId, async () => {
     const origin = await loadOwnedSnapshot(repos, originSessionId, userId);

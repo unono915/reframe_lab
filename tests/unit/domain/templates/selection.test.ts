@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { selectTemplateForDate } from "@/domain/templates/selection";
+import {
+  resolveTimeZone,
+  selectTemplateForDate,
+  todayDateString,
+} from "@/domain/templates/selection";
 import { DAILY_TEMPLATES } from "@/data/templates";
 import type { TrainingTemplate } from "@/domain/types";
 
@@ -202,5 +206,33 @@ describe("DAILY_TEMPLATES fixture data", () => {
 
   it("is all active by default", () => {
     expect(DAILY_TEMPLATES.every((t) => t.active)).toBe(true);
+  });
+});
+
+/**
+ * 시간대 값은 브라우저가 보고한 것을 그대로 서버까지 들고 온 것이라, `Intl`이 모르는
+ * 값이 오는 경로가 실제로 있다 — 지문 방지 설정이 켜진 브라우저, 오래된 런타임,
+ * 그리고 주소창에서 쿼리를 고친 사람. 던지게 두면 홈·성장·오늘의 렌즈가 한꺼번에
+ * 500으로 죽고, 화면에는 원인을 알 수 없는 "잠시 문제가 생겼어요"만 남는다.
+ */
+describe("시간대 값이 이상해도 앱은 계속 쓸 수 있어야 한다", () => {
+  it("모르는 시간대를 받아도 날짜를 돌려준다", () => {
+    expect(todayDateString("Not/AZone")).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(todayDateString("")).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("제대로 된 시간대는 그대로 쓴다", () => {
+    // 서울과 UTC는 9시간 차이라, UTC 기준으로 아직 어제인 시각이 존재한다.
+    // 두 값이 항상 같지는 않지만 형식은 언제나 YYYY-MM-DD여야 한다.
+    expect(todayDateString("Asia/Seoul")).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("저장하기 전에 못 쓰는 값은 UTC로 바꾼다", () => {
+    // DB에 못 쓰는 값이 들어가면, 그 세션을 읽는 모든 경로가 나중에 같은 자리에서 걸린다.
+    expect(resolveTimeZone("Asia/Seoul")).toBe("Asia/Seoul");
+    expect(resolveTimeZone("Not/AZone")).toBe("UTC");
+    expect(resolveTimeZone("")).toBe("UTC");
+    expect(resolveTimeZone(null)).toBe("UTC");
+    expect(resolveTimeZone(undefined)).toBe("UTC");
   });
 });

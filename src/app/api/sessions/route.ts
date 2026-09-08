@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { selectTemplateForDate, todayDateString } from "@/domain/templates/selection";
+import {
+  resolveTimeZone,
+  selectTemplateForDate,
+  todayDateString,
+} from "@/domain/templates/selection";
 import { apiError } from "@/lib/errors";
 import { createRouteContext, withIdempotency } from "../_lib/route-context";
 
@@ -52,7 +56,10 @@ export async function POST(request: NextRequest) {
   const parsed = createSessionSchema.safeParse(json);
   if (!parsed.success)
     return apiError("validation_error", parsed.error.issues[0]?.message);
-  const { clientGeneratedId, timezone, clientRequestId } = parsed.data;
+  const { clientGeneratedId, clientRequestId } = parsed.data;
+  // 브라우저가 보고한 값을 그대로 저장하지 않는다 — `Intl`이 모르는 값이면 이 세션을
+  // 읽는 모든 경로가 나중에 같은 자리에서 걸린다.
+  const timezone = resolveTimeZone(parsed.data.timezone);
 
   /** 클라이언트가 렌즈를 지정하지 않았을 때 서버가 같은 규칙으로 고른다. */
   async function pickTodayTemplateId(): Promise<string | null> {

@@ -1,6 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { resetActiveSession } from "./helpers/cleanup";
-import { fillStagesUntilQuestioning, settle } from "./helpers/training-flow";
+import {
+  DEFAULT_CONTENT,
+  fillStagesUntilQuestioning,
+  settle,
+} from "./helpers/training-flow";
 
 /**
  * 아직 마치지 않은 기록을 열었을 때의 회귀 테스트.
@@ -59,4 +63,34 @@ test("없는 기록을 열면 막히지 않고 목록으로 돌아갈 수 있다
   await page.getByRole("button", { name: "기록 목록으로" }).click();
 
   await expect(page).toHaveURL(/\/history$/);
+});
+
+test("여기서 그만두면 기록은 남고, 다음 훈련을 새로 시작할 수 있다", async ({
+  page,
+  request,
+}) => {
+  /*
+    PRD §6.2는 "사용자는 세션을 명시적으로 보류하거나 포기할 수 있다"고 정하는데, 그
+    경로가 서버·도메인에는 있고 **화면에는 없었다.** 활성 세션은 하나뿐이라, 오늘
+    시작해놓고 마음이 바뀐 사람에게 남은 선택지는 끝까지 하거나 쓴 것을 통째로
+    지우는 것뿐이었다.
+  */
+  await page.goto("/training/new");
+  await fillStagesUntilQuestioning(page);
+  await settle(page);
+  const sessionId = (page.url().split("/training/")[1] ?? "").split("?")[0];
+
+  await page.goto(`/result/${sessionId}`);
+  await page.getByRole("button", { name: "여기서 그만두기" }).click();
+  await page.getByRole("button", { name: "그만두기", exact: true }).click();
+
+  // 기록은 남는다 — 지운 것이 아니다.
+  await expect(page.getByText("중단됨")).toBeVisible();
+  await expect(page.getByText(DEFAULT_CONTENT.observation)).toBeVisible();
+  // 되살릴 수 없는 상태이므로 이어서 하기는 사라진다.
+  await expect(page.getByRole("button", { name: "이어서 하기" })).toHaveCount(0);
+
+  // 활성 세션이 비었으니 새 훈련을 시작할 수 있다 — 이것이 이 경로의 요점이다.
+  const active = await request.get("/api/sessions?status=active");
+  expect(((await active.json()) as { snapshot: unknown }).snapshot).toBeNull();
 });

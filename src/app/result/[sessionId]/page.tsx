@@ -82,6 +82,8 @@ export default function ResultPage() {
   const [revisitPending, setRevisitPending] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deletePending, setDeletePending] = useState(false);
+  const [confirmingAbandon, setConfirmingAbandon] = useState(false);
+  const [abandonPending, setAbandonPending] = useState(false);
   /** 두 동작의 실패 안내를 함께 쓴다 — 한 번에 하나만 진행되므로 섞일 일이 없다. */
   const [actionError, setActionError] = useState<string | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
@@ -178,6 +180,39 @@ export default function ResultPage() {
       return;
     }
     router.push("/history");
+  }
+
+  /**
+   * 훈련을 여기서 그만둔다 — 기록은 남기고 "중단됨"으로 표시한다.
+   *
+   * PRD §6.2는 "사용자는 세션을 명시적으로 보류하거나 포기할 수 있다"고 정하는데,
+   * 그 경로가 서버·도메인에는 있고 **화면에는 없었다.** 그래서 오늘 시작해놓고 마음이
+   * 바뀐 사람에게 남은 선택지는 둘뿐이었다: 끝까지 하거나, 쓴 것을 통째로 지우거나.
+   * 활성 세션은 하나뿐이라(DB 제약) 그 세션을 정리하기 전에는 내일 새로 시작할 수도
+   * 없다 — 지우는 것 말고는 빠져나갈 길이 없었다는 뜻이다.
+   */
+  async function handleAbandon() {
+    if (!snapshot) return;
+    setAbandonPending(true);
+    setActionError(null);
+    const result = await fetchJson<{ snapshot: TrainingSessionSnapshot }>(
+      `/api/sessions/${snapshot.session.id}/abandon`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          expectedStateVersion: snapshot.session.stateVersion,
+          clientRequestId: crypto.randomUUID(),
+        }),
+      },
+    );
+    setAbandonPending(false);
+    if (!result.ok) {
+      setActionError(result.message);
+      return;
+    }
+    setConfirmingAbandon(false);
+    setSnapshot(result.data.snapshot);
   }
 
   if (pageError) {
@@ -593,6 +628,46 @@ export default function ResultPage() {
             {revisitPending ? "새 기록을 만드는 중" : "이 장면 다시 생각하기"}
           </Button>
         )}
+
+        {/*
+          그만두기는 이어서 할 수 있는 세션에서만 의미가 있다. 지우기와 나란히 두되
+          문구는 담담하게 — "포기"·"실패" 같은 단정적 표현을 쓰지 않는 것이 이 앱의
+          완료 조건이다(`stages.ts` sessionStatusLabel 주석).
+        */}
+        {canResume &&
+          (!confirmingAbandon ? (
+            <Button
+              type="button"
+              variant="tertiary"
+              fullWidth
+              onClick={() => setConfirmingAbandon(true)}
+            >
+              여기서 그만두기
+            </Button>
+          ) : (
+            <Stack gap={2}>
+              <p className="text-caption text-text-secondary">
+                여기까지 쓴 내용은 기록에 그대로 남고, 이어서 하기는 더 이상 할 수 없어요.
+              </p>
+              <Stack direction="row" gap={2}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleAbandon}
+                  disabled={abandonPending}
+                >
+                  {abandonPending ? "정리하는 중" : "그만두기"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="tertiary"
+                  onClick={() => setConfirmingAbandon(false)}
+                >
+                  계속하기
+                </Button>
+              </Stack>
+            </Stack>
+          ))}
 
         {!confirmingDelete ? (
           <Button

@@ -686,6 +686,36 @@ mappers.ts 0% → 100%(문장), 전체 분기 커버리지 58.6% → 66.4%.
 
 ---
 
+### 통합 테스트 6건이 한 번도 자동 실행된 적 없다 — 그래서 손으로 확인했다
+
+`tests/integration/`의 RLS 4건과 RPC 재조정 2건은 `SUPABASE_DB_URL`(Postgres 직접
+접속 문자열)이 없으면 `describe.skipIf`로 통째로 건너뛴다. 그 값은 `.env.local`에도
+CI 시크릿에도 없다. **이 앱의 핵심 보안 경계가 자동으로 검증된 적이 없다**는 뜻이다.
+
+값을 넣는 것은 사용자만 할 수 있으므로, 대신 같은 절차를 Supabase MCP로 실행했다.
+테스트와 똑같이 `request.jwt.claims`를 주입하고 `authenticated` 역할로 전환하되,
+**행을 만들지 않고**(남 역할은 `auth.users`에 없어도 된다 — RLS는 `auth.uid()`만 본다)
+마지막에 일부러 예외를 던져 트랜잭션을 통째로 되돌렸다.
+
+결과(2026-09-08, 마이그레이션 0009 적용 뒤):
+
+- `training_sessions` — 소유자 239건 / 남 **0건**, 수정 **0건**, 삭제 **0건**
+- 자식 11개 표 전부 동일: `observations` 239/0, `stage_responses` 2403/0,
+  `questions` 717/0, `reframes` 478/0, `problem_definition_versions` 240/0,
+  `ai_feedbacks` 47/0, `coach_interactions` 2/0, `idempotency_keys` 8942/0 …
+
+남에게는 행의 **존재 자체가 보이지 않는다**(0건이지 권한 오류가 아니다).
+
+**0009의 정리 cron도 함께 확인했다.** `purge-expired-idempotency-keys`가 활성이고
+직전 실행(23:17 UTC)이 성공, 만료됐는데 남아 있는 행은 **0건**, 가장 오래된 행이
+24시간 창 안에 있다. 18일 만에 2,154행이 쌓이던 문제는 실제로 멈춰 있다.
+
+> **남는 것.** 이 확인은 재현 가능한 형태가 아니다. `SUPABASE_DB_URL`을 CI 시크릿에
+> 넣으면 위 6건이 매 커밋마다 돌아간다 — CI 시크릿 4개와 같은 성격의, 사용자만 할 수
+> 있는 일이다.
+
+---
+
 ### 검증
 
 typecheck·lint·단위 333개 통과(신규 17개: `useMutationAction` 5, offset 경계 1,

@@ -1522,3 +1522,29 @@ Growth 지표는 API 응답과 SQL 집계를 숫자 단위로 대조했다. "테
   실패하고 있었고 아무도 보지 않았다.
 - **E2E를 돌리기 전 3100 포트를 내린다.** `reuseExistingServer` 때문에 서버가 떠 있으면
   다시 빌드하지 않아, 방금 고친 코드가 아니라 옛 빌드를 테스트하게 된다.
+- **`page.route`를 쓰는 spec에는 `test.use({ serviceWorkers: "block" })`을 함께 넣는다.**
+  Service Worker가 요청을 먼저 집으면 WebKit에서만 가로채기가 무시된다. 이 저장소가
+  세 번 빠진 함정이다.
+- **테스트 명령을 `| tail`로 파이프하면 종료 코드가 가려진다.** `npm run test:e2e > log;
+  echo $?`처럼 코드를 따로 확인할 것 — 실패한 실행을 통과로 착각하고 커밋한 적이 있다.
+
+---
+
+### 값이 맞는지 확인하는 법
+
+"테스트가 통과한다"와 "값이 맞다"는 다른 이야기다. 이 저장소는 후자에서 크게 틀린 적이
+있어서(Growth가 데이터의 3분의 1로 추세를 말했다), 숫자를 의심할 때 쓰는 방법을 적어둔다.
+
+**Growth 지표 ↔ SQL 대조.** `/api/growth`의 응답과 같은 것을 DB에서 직접 세어 맞춰본다.
+`training_sessions`를 `started_at desc`로 365개 잘라(`GROWTH_WINDOW`) 완료 수, 사용자
+작성 재정의 수, 정의 수정 세션 수, 그리고 "혼자 해낸 기록"(완료 + `ai_call_count = 0` +
+`stage_responses`에 `solo_mode` 표식)을 센다. 2026-09-08에 이 방법으로 여섯 숫자가
+전부 일치하는 것을 확인했다.
+
+**코치 응답이 진짜인지.** `coach_interactions.provider`는 fallback으로 떨어진 행에도
+`upstage`로 적힌다(설정된 제공자를 적기 때문이다). **`status`와 `error_code`를 봐야
+한다** — `ok`면 모델 응답, `fallback`이면 규칙 기반이고 그 이유가 `error_code`에 있다
+(`guardrail:*`, `session_call_cap_reached` 등).
+
+**데이터 경계.** `tests/e2e/rls-anonymous.spec.ts`가 익명 접근을 자동으로 확인한다.
+소유자/타인 구분까지 보려면 `SUPABASE_DB_URL`이 필요하다(`tests/integration/`).

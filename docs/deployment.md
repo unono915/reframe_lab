@@ -110,13 +110,29 @@ Vercel Deployments → 최신 배포 → `⋯` → **Redeploy**. 이때 *Use exi
 
 ## 5. 배포 후에도 남는 항목
 
-- **§14-D — AI 제공자 미연결.** 지금은 Mock 코치(고정 질문 은행)로만 동작한다.
-  7단계 완주와 자기 점검 경로는 정상이라 앱 구조·PWA 검증에는 지장이 없다.
-  제공자를 정하면 `getActiveCoachProvider()`(`src/lib/ai/providers/index.ts`)
-  한 곳만 교체하면 되고, API Key는 `NEXT_PUBLIC_` 없이 서버 전용 환경변수로 넣는다.
+- ~~**§14-D — AI 제공자 미연결.**~~ 해결됨(2026-08-26) — Upstage `solar-pro4` 연결 완료.
+  `UPSTAGE_API_KEY`를 서버 전용 환경변수(`NEXT_PUBLIC_` 접두사 없이)로 넣는다.
+  값이 없으면 규칙 기반 Mock으로 돌아가고, 훈련 완주에는 지장이 없다(원칙 8).
 - **§14-H — 개인정보 보존·삭제 정책.** 본인 외 사용자에게 URL을 공유하기 전에 정한다.
 - **Deployment Protection.** Preview URL은 기본적으로 URL을 아는 사람이면 열 수 있다.
   본인만 쓰려면 Project Settings → Deployment Protection에서 Vercel Authentication을
   켠다.
 - **Supabase 보안 권고 1건** — `auth_leaked_password_protection`(WARN). Authentication
   → Policies에서 켤 수 있는 대시보드 설정이라 코드로는 못 고친다.
+
+## 6. GitHub Actions 시크릿 (계정 소유자만 가능)
+
+CI에는 두 묶음의 시크릿이 필요하다. **없어도 CI는 초록으로 끝나지만, 그만큼 검증이
+줄어든다** — 어느 쪽이 빠졌는지는 워크플로 요약의 경고에 남는다.
+
+| 시크릿 | 없으면 |
+| --- | --- |
+| `E2E_SUPABASE_URL`, `E2E_SUPABASE_ANON_KEY`, `E2E_TEST_EMAIL`, `E2E_TEST_PASSWORD` | 브라우저 테스트(훈련 완주·오류 경로·접근성)를 **하나도 돌리지 않는다** |
+| `SUPABASE_DB_URL` (Postgres 직접 접속 문자열) | `tests/integration/`의 **RLS 4건 + RPC 재조정 2건**을 건너뛴다 — 이 앱의 보안 경계 검증이다 |
+
+`E2E_TEST_EMAIL`은 실사용자 계정이 아니라 전용 테스트 계정이다(`CLAUDE.md` §12 참고).
+
+> **주의.** 워크플로 파일을 고쳤다면 `gh run list`로 **실제 결과를 확인할 것.**
+> 2026-09-08까지 모든 CI 실행이 `format:check`에서 실패하고 있었는데, 그 뒤 단계
+> (테스트·빌드·E2E)가 통째로 돌지 않는데도 아무도 보지 않았다. 파일을 고친 것과
+> 그것이 도는 것은 다른 일이다.

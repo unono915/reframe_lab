@@ -26,7 +26,18 @@ export default defineConfig({
   globalSetup: hasE2ELogin ? "./tests/e2e/global-setup" : undefined,
   use: {
     baseURL: BASE_URL,
-    trace: "on-first-retry",
+    /*
+      실패한 테스트는 항상 trace를 남긴다.
+
+      예전 설정(`on-first-retry`)은 로컬에서 아무것도 남기지 않았다 — 로컬 재시도는
+      0이라 "첫 재시도"가 영영 오지 않기 때문이다. 그래서 전체 실행 중 한 번 깨진
+      테스트를 놓고 **무엇이 잘못됐는지 볼 자료가 하나도 없었고**, 따로 다시 돌려
+      재현되지 않자 그대로 넘어갈 뻔했다(2026-09-08).
+
+      이 저장소에서 "가끔 깨진다"는 여러 번 진짜 버그였다. 다시 돌려서 통과하는 것과
+      원인을 아는 것은 다른 이야기라, 실패했을 때의 기록만은 남겨둔다.
+    */
+    trace: "retain-on-failure",
     ...(hasE2ELogin ? { storageState: STORAGE_STATE_PATH } : {}),
   },
   // Phase 3부터 각 단계 전환이 실제 Supabase 네트워크 왕복을 거친다(더 이상 즉시

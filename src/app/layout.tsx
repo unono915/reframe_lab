@@ -13,6 +13,19 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "다시봄",
   },
+  other: {
+    /*
+      iOS 16.4 미만은 manifest의 `display: "standalone"`을 읽지 않는다. 그 버전에서
+      홈 화면 아이콘으로 열면 **Safari UI가 그대로 남은 채** 뜬다 — 이 앱의 1차 타깃이
+      "iPhone 홈 화면 설치형"인 것을 생각하면 첫인상이 통째로 달라지는 차이다.
+
+      `appleWebApp.capable: true`를 이미 선언했는데도 필요한 이유는, Next 16이 그
+      선언을 modern 태그(`mobile-web-app-capable`) 하나로만 내보내기 때문이다
+      (node_modules/next/dist/docs/.../generate-metadata.md의 출력 예시로 확인).
+      선언한 의도와 실제로 나가는 태그가 어긋나 있어서 직접 넣는다.
+    */
+    "apple-mobile-web-app-capable": "yes",
+  },
   icons: {
     icon: [
       { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },

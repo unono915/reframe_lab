@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 /**
  * 7단계 훈련 플로우를 E2E에서 재사용하는 조작 헬퍼.
@@ -85,6 +85,12 @@ export async function fillStagesUntilFeedback(
   page: Page,
   content: TrainingContent = DEFAULT_CONTENT,
 ): Promise<void> {
+  // 예산 선언을 **여기** 둔다. 이 헬퍼를 부르는 순간 그 테스트는 7단계를 전부
+  // 채우게 되고, 기본 30초로는 정상 동작에서도 넘긴다(실제로 그렇게 깨졌다).
+  // 호출부마다 `test.setTimeout`을 적게 하면 새 테스트가 생길 때마다 같은 실패를
+  // 한 번씩 겪는다 — 느린 이유가 있는 자리에서 선언하는 편이 맞다.
+  test.slow();
+
   await expect(page.getByText("1 / 7 관찰")).toBeVisible();
   await settle(page);
   await page.getByLabel("관찰한 장면").fill(content.observation);

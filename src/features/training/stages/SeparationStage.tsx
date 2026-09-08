@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { ItemType } from "@/domain/types";
 import { Button, Card, Field, Stack, Textarea } from "@/components/ui";
 import { INPUT_LIMITS } from "@/lib/schemas/stage-input";
@@ -31,6 +31,7 @@ export function SeparationStage() {
   const [type, setType] = useState<ItemType>("fact");
   const [exceptionReason, setExceptionReason] = useState("");
   const addAction = useMutationAction();
+  const itemInputRef = useRef<HTMLTextAreaElement>(null);
   const confirmAction = useMutationAction();
 
   if (!snapshot) return null;
@@ -44,6 +45,10 @@ export function SeparationStage() {
     // 값을 지워버린다(연속 추가 시 실제로 재현됨).
     const submitted = text;
     setText("");
+    // 다음 항목을 바로 이어 쓸 수 있게 입력창으로 focus를 돌린다. **await 앞에서**
+    // 부르는 것이 중요하다 — iOS는 사용자 제스처가 살아 있는 동안에만 키보드를
+    // 열어주므로, 저장을 기다린 뒤에 부르면 focus만 가고 키보드는 닫힌 채로 남는다.
+    itemInputRef.current?.focus();
     // 저장이 실패하면 방금 지운 입력을 되돌린다 — 그러지 않으면 사용자가 쓴 문장이
     // 서버에도 화면에도 남지 않는다(원칙 7).
     await addAction.run(
@@ -116,6 +121,7 @@ export function SeparationStage() {
           counter={{ current: text.length, max: INPUT_LIMITS.observationItemText }}
         >
           <Textarea
+            ref={itemInputRef}
             value={text}
             onChange={(e) => setText(e.target.value)}
             autoGrow={false}

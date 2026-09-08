@@ -489,6 +489,34 @@ describe("describeRemainingRequirement", () => {
     expect(message).not.toContain("핵심 질문");
   });
 
+  /*
+    나머지 네 단계도 문장을 갖고 있는데 검증이 없었다. 이 문구는 **버튼이 왜 눌리지
+    않는지** 알려주는 유일한 통로다 — 없거나 비면 사용자는 아무 설명 없이 막힌다.
+    빈 문자열도 "말하지 않음"과 같으므로 내용이 있는지까지 본다.
+  */
+  it("남은 단계마다 무엇이 부족한지 말한다", () => {
+    const empty = makeSnapshot();
+    for (const stage of [
+      "observation",
+      "separation",
+      "definition",
+      "feedback",
+    ] as const) {
+      const message = describeRemainingRequirement(stage, empty);
+      expect(message, `${stage}에 안내 문구가 없다`).toBeTruthy();
+      expect(message!.trim().length, `${stage}의 안내가 비어 있다`).toBeGreaterThan(0);
+    }
+  });
+
+  it("이미 채운 단계에는 아무 말도 하지 않는다", () => {
+    const done = makeSnapshot({
+      observation: makeObservation({ rawText: "장면 하나" }),
+      observationItems: [makeObservationItem({ userConfirmed: true })],
+    });
+    expect(describeRemainingRequirement("observation", done)).toBeNull();
+    expect(describeRemainingRequirement("separation", done)).toBeNull();
+  });
+
   it("탐색은 남은 질문 수를 센다", () => {
     const snapshot = makeSnapshot({
       stageResponses: passingExplorationResponses().slice(0, 2),

@@ -136,9 +136,9 @@ const GHOSTWRITING_PATTERNS = [
   /로\s*정의(할\s*수\s*있|됩니다|합니다)/,
 ];
 
-function checkNoGhostwriting(output: CoachOutputSchema, currentStage: Stage): boolean {
+function checkNoGhostwriting(texts: string[], currentStage: Stage): boolean {
   if (currentStage !== "definition" && currentStage !== "feedback") return true;
-  return !GHOSTWRITING_PATTERNS.some((pattern) => pattern.test(output.coachMessage));
+  return !texts.some((text) => GHOSTWRITING_PATTERNS.some((p) => p.test(text)));
 }
 
 /**
@@ -345,11 +345,29 @@ export function runCoachGuardrails(
   const evidence = checkEvidence(output, context.userText);
   if (evidence.violated) violations.push("unverified_evidence");
 
-  if (!checkNoFabricatedNumbers(output.coachMessage, context.userText)) {
+  /*
+    내용 검사는 **사용자가 실제로 보는 문장**에도 걸어야 한다.
+
+    예전에는 셋 다 `coachMessage`만 봤다. 그런데 힌트 경로는 `question`만 돌려주고
+    화면도 그것만 그린다 — `coachMessage`는 어디에도 표시되지 않는다(`repairs`로
+    비워버리는 것도 그래서 가능했다). 결국 원칙 3(해결책·대필 금지)과 원칙 5(사실
+    창작 금지)를 **보이지 않는 필드에만** 걸고 있었고, 정작 사용자가 읽는 질문에
+    "담당자를 바꿔 보세요" 같은 해결책이나 사용자가 말한 적 없는 숫자가 들어가도
+    그대로 통과했다.
+
+    확장해도 좋은 코칭을 막지 않는다는 것은 근거를 두고 확인했다 — 이 앱이 스스로
+    좋은 코칭이라고 보는 규칙 기반 질문 21개(`lib/ai/fallback.ts`)가 전부 통과한다.
+    그 사실은 테스트로 고정해두었다(`tests/unit/lib/ai/fallback-questions.test.ts`).
+  */
+  const shownTexts = [output.coachMessage, output.question ?? ""];
+
+  if (shownTexts.some((text) => !checkNoFabricatedNumbers(text, context.userText))) {
     violations.push("fabricated_fact");
   }
-  if (!checkNoGhostwriting(output, context.currentStage)) violations.push("ghostwriting");
-  if (!checkNoSolution(output.coachMessage)) violations.push("solution_suggested");
+  if (!checkNoGhostwriting(shownTexts, context.currentStage))
+    violations.push("ghostwriting");
+  if (shownTexts.some((text) => !checkNoSolution(text)))
+    violations.push("solution_suggested");
   if (!checkValidNextStage(output, context.currentStage))
     violations.push("invalid_next_stage");
   if (!checkNotRepeated(output, context.recentQuestions))

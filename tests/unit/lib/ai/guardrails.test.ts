@@ -5,11 +5,14 @@ import {
   checkNoSolution,
 } from "@/lib/ai/guardrails";
 import {
+  FABRICATED_NUMBER_IN_QUESTION_OUTPUT,
   FABRICATED_NUMBER_OUTPUT,
+  GHOSTWRITING_IN_QUESTION_OUTPUT,
   GHOSTWRITING_OUTPUT,
   INVALID_NEXT_STAGE_OUTPUT,
   MULTIPLE_QUESTIONS_OUTPUT,
   REPEATED_QUESTION_OUTPUT,
+  SOLUTION_IN_QUESTION_OUTPUT,
   SOLUTION_SUGGESTED_OUTPUT,
   UNVERIFIED_EVIDENCE_OUTPUT,
   VALID_OUTPUT,
@@ -26,6 +29,40 @@ describe("runCoachGuardrails — 정상 응답", () => {
     const result = runCoachGuardrails(VALID_OUTPUT, baseContext);
     expect(result.ok).toBe(true);
     expect(result.violations).toEqual([]);
+  });
+});
+
+describe("runCoachGuardrails — 사용자가 보는 문장도 검사한다", () => {
+  /*
+    내용 검사가 오래도록 `coachMessage`만 보고 있었다. 그런데 힌트 경로는 `question`만
+    돌려주고 화면도 그것만 그린다 — 원칙 3(해결책·대필 금지)과 원칙 5(사실 창작 금지)를
+    **보이지 않는 필드에만** 걸고 있었던 셈이다.
+  */
+  it("질문에 든 해결책 제안을 잡는다", () => {
+    const result = runCoachGuardrails(SOLUTION_IN_QUESTION_OUTPUT, baseContext);
+    expect(result.ok).toBe(false);
+    expect(result.violations).toContain("solution_suggested");
+  });
+
+  it("질문에 든 없는 숫자를 잡는다", () => {
+    const result = runCoachGuardrails(FABRICATED_NUMBER_IN_QUESTION_OUTPUT, baseContext);
+    expect(result.ok).toBe(false);
+    expect(result.violations).toContain("fabricated_fact");
+  });
+
+  it("질문 모양을 한 대필을 잡는다", () => {
+    const result = runCoachGuardrails(GHOSTWRITING_IN_QUESTION_OUTPUT, {
+      ...baseContext,
+      currentStage: "definition",
+    });
+    expect(result.ok).toBe(false);
+    expect(result.violations).toContain("ghostwriting");
+  });
+
+  it("멀쩡한 질문은 그대로 통과시킨다", () => {
+    // 검사를 넓히면서 좋은 코칭까지 막지 않았는지 같은 자리에서 확인한다.
+    const result = runCoachGuardrails(VALID_OUTPUT, baseContext);
+    expect(result.ok).toBe(true);
   });
 });
 

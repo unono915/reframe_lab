@@ -88,12 +88,34 @@ export function checkNoFabricatedNumbers(text: string, userText: string): boolea
   return numbers.every((n) => userText.includes(n));
 }
 
-/** 5. 대필 패턴 검사 — definition/feedback 단계에서 문제 정의 문장 형태를 띠면 위반. */
-const GHOSTWRITING_PATTERN = /에서\s*.+는\s*.+때문에\s*.+(겪|경험)/;
+/**
+ * 5. 대필 검사 — 정의·돌아보기 단계에서 AI가 **문제 정의를 대신 써주면** 위반 (원칙 3).
+ *
+ * 원래는 패턴이 하나뿐이었다: `…에서 …는 … 때문에 …를 겪고 있다`. 실제로 나올 법한
+ * 대필 문장 다섯 개로 재보니 **하나만 잡혔다.** "당신의 문제 정의는 …입니다" 같은
+ * 노골적인 대필조차 통과했다 — 문장 틀이 조금만 달라도 빠져나간다.
+ *
+ * 그래서 **정의를 선언하는 표지**를 함께 본다. 코칭은 묻고, 대필은 단정한다.
+ * 아래 패턴들은 전부 "그래서 문제는 이것이다"라고 못 박는 말투다.
+ *
+ * 한계도 적어둔다: 표지 없이 정의 문장만 툭 내놓는 경우("회의 시작 시각과 참석자 이동
+ * 동선이 맞지 않아 반복 지각이 발생하고 있다.")는 **어휘로는 구분할 수 없다.** 같은
+ * 모양의 문장이 "지금 정의에서 이런 점이 잘 드러납니다" 같은 정당한 논평일 수도 있기
+ * 때문이다. 그 경계는 프롬프트와 근거 검사(3번)가 맡는다.
+ */
+const GHOSTWRITING_PATTERNS = [
+  /에서\s*.+는\s*.+때문에\s*.+(겪|경험)/,
+  /문제\s*정의는\s*[^?]*(입니다|이다|예요|이에요)/,
+  /(이렇게|다음과\s*같이|이런\s*식으로)\s*정의(할\s*수\s*있|하면|됩니다|합니다)/,
+  // `습니다`까지 받는다 — "…지연되고 있습니다"처럼 `입니다`가 아닌 종결이 흔하다.
+  /(정리하면|요약하면|결론적으로)[,\s][^?]*(습니다|입니다|이다)/,
+  /문제는\s*[^?]{5,}(입니다|이다)/,
+  /로\s*정의(할\s*수\s*있|됩니다|합니다)/,
+];
 
 function checkNoGhostwriting(output: CoachOutputSchema, currentStage: Stage): boolean {
   if (currentStage !== "definition" && currentStage !== "feedback") return true;
-  return !GHOSTWRITING_PATTERN.test(output.coachMessage);
+  return !GHOSTWRITING_PATTERNS.some((pattern) => pattern.test(output.coachMessage));
 }
 
 /**

@@ -291,3 +291,72 @@ describe("checkNoSolution — 코칭과 해결책을 가른다", () => {
     );
   });
 });
+
+/**
+ * 대필 검사(원칙 3의 나머지 절반 — "AI는 최종 문제 정의를 대신 만들지 않는다").
+ *
+ * 원래 패턴은 하나뿐이었고, 실제로 나올 법한 대필 문장 다섯 개 중 **하나만** 잡았다.
+ * "당신의 문제 정의는 …입니다" 같은 노골적인 대필조차 통과했다 — 문장 틀이 조금만
+ * 달라도 빠져나간다. 코칭은 묻고 대필은 단정한다는 차이를 표지로 잡는다.
+ */
+describe("checkNoGhostwriting — 정의를 대신 써주면 막는다", () => {
+  const base = {
+    currentStage: "definition" as const,
+    action: "ask" as const,
+    question: "지금 정의에서 확인된 사실은 무엇인가요?",
+    detectedGaps: [],
+    evidenceReferences: [],
+    hintLevel: 0 as const,
+    suggestedNextStage: null,
+    safetyFlags: [],
+  };
+  const context = {
+    currentStage: "definition" as const,
+    userText: "회의 때마다 한 사람이 늦게 들어온다",
+    recentQuestions: [],
+  };
+  const ghostwrote = (coachMessage: string) =>
+    runCoachGuardrails({ ...base, coachMessage }, context).violations.includes(
+      "ghostwriting",
+    );
+
+  it.each([
+    "문제는 이렇게 정의할 수 있습니다: 승인 기준이 공유되지 않아 결과가 달라진다.",
+    "정리하면, 팀은 채널 선택 기준이 없어서 응답이 지연되고 있습니다.",
+    "주간 회의에서 실무자는 결정 권한이 없기 때문에 논의가 미뤄지는 문제를 겪고 있습니다.",
+    "당신의 문제 정의는 기준 부재로 인한 결과 편차입니다.",
+    "요약하면 승인 기준이 공유되지 않는 것이 문제입니다.",
+  ])("정의를 단정하면 막는다: %s", (message) => {
+    expect(ghostwrote(message)).toBe(true);
+  });
+
+  it.each([
+    "지금 정의에서 확인된 사실이 잘 드러납니다.",
+    "문제 정의를 다시 읽어 보세요.",
+    "아직 확인되지 않은 부분이 남아 있습니다.",
+    "정의에 사람과 상황이 함께 담기면 더 또렷해집니다.",
+    "정리하면 무엇이 남나요?",
+  ])("정의를 두고 논평하거나 묻는 것은 대필이 아니다: %s", (message) => {
+    expect(ghostwrote(message)).toBe(false);
+  });
+
+  it("표지 없이 정의 문장만 내놓는 경우는 어휘로 구분할 수 없다 — 프롬프트가 맡는다", () => {
+    // 같은 모양의 문장이 정당한 논평일 수도 있어서, 여기서 잡으면 좋은 응답까지 버린다.
+    // 이 한계를 테스트로 적어둔다 — 나중에 "왜 안 잡히지"를 다시 조사하지 않도록.
+    expect(
+      ghostwrote("회의 시작 시각과 이동 동선이 맞지 않아 반복 지각이 발생하고 있다."),
+    ).toBe(false);
+  });
+
+  it("정의·돌아보기 단계가 아니면 같은 문장이어도 대필이 아니다", () => {
+    const atObservation = runCoachGuardrails(
+      {
+        ...base,
+        currentStage: "observation",
+        coachMessage: "당신의 문제 정의는 A입니다.",
+      },
+      { ...context, currentStage: "observation" },
+    );
+    expect(atObservation.violations).not.toContain("ghostwriting");
+  });
+});

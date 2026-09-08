@@ -81,19 +81,27 @@ test("AI를 기다리는 동안 무엇을 기다리는지 보인다", async ({ p
   await page.getByLabel("새 질문").fill("왜 이 사람만 늦을까?");
   await page.getByRole("button", { name: "질문 추가하기" }).click();
 
-  // 실제 응답을 그대로 쓰되 2초 늦춘다 — 대기 구간을 관찰 가능한 길이로 만든다.
+  // 응답을 **테스트가 붙잡고 있다가** 놓아준다. 고정 지연(2초)으로는 부족했다 —
+  // 실제 제공자 왕복이 얼마나 걸릴지 모르는 데다, 느린 기기에서는 단언이 시작되기
+  // 전에 응답이 도착해 대기 카드를 놓쳤다(iOS Safari에서 실제로 그렇게 깨졌다).
+  // 문을 잠가두면 "지금 반드시 대기 중"이 보장된다.
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
   await page.route("**/api/sessions/*/coach", async (route) => {
     const response = await route.fetch();
-    await new Promise((resolve) => setTimeout(resolve, 2_000));
+    await held;
     await route.fulfill({ response });
   });
 
+  const loading = page.getByText("다음 질문을 정리하고 있어요.");
   await page.getByRole("button", { name: "힌트 보기" }).click();
-  await expect(page.getByText("다음 질문을 정리하고 있어요.")).toBeVisible();
+  await expect(loading).toBeVisible();
+
+  release();
   // 응답이 오면 대기 카드는 사라진다 — 그 자리에 힌트가 들어선다.
-  await expect(page.getByText("다음 질문을 정리하고 있어요.")).toBeHidden({
-    timeout: 30_000,
-  });
+  await expect(loading).toBeHidden({ timeout: 30_000 });
 });
 
 test("힌트 요청이 서버 오류로 실패하면 사용자에게 오류가 보인다", async ({ page }) => {

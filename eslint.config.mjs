@@ -96,6 +96,33 @@ const layerBoundaries = [
       ],
     },
   },
+  {
+    // 화면(`src/app/**/*.tsx` — page·layout)에도 같은 경계를 건다. `features/`와
+    // `components/`만 막고 있었는데, 화면 파일은 그 규칙 밖이라 구멍이 있었다.
+    //
+    // 이게 왜 보안 문제인가: 이 앱의 AI 제공자 Adapter는 **서버 전용 API Key**를
+    // 읽는다(원칙 9). 클라이언트 컴포넌트가 `@/lib/ai/*`를 import하면 그 모듈이
+    // 클라이언트 번들에 딸려 들어가고, 서버 전용 값이 브라우저로 나갈 길이 생긴다.
+    // 저장소·Supabase SDK도 같은 이유로 화면이 직접 만지지 않는다 — 데이터 접근은
+    // Route Handler(`src/app/api/**`)를 거쳐야 인증·멱등성·오류 코드가 지켜진다.
+    //
+    // `.tsx`만 고른 이유: Route Handler는 전부 `.ts`이고, 그쪽은 서버라 이 import들이
+    // 정상이다.
+    files: ["src/app/**/*.tsx"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            "@/lib/repositories/*",
+            "@/lib/ai/*",
+            "@/lib/supabase/*",
+            "@supabase/*",
+          ],
+        },
+      ],
+    },
+  },
 ];
 
 const eslintConfig = [

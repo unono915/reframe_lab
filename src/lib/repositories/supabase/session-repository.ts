@@ -21,6 +21,7 @@ interface SelfCheckRow {
   content: string;
   is_draft: boolean;
 }
+import { fetchAllRows } from "./paging";
 import type { Database } from "@/lib/supabase/database.types";
 import type { CreateSessionParams, SessionRepository } from "../types";
 import {
@@ -300,62 +301,89 @@ export function createSupabaseSessionRepository(
 
       const ids = sessionRows.map((row) => row.id);
       const [
-        observationsResult,
-        definitionsResult,
-        reframesResult,
-        feedbacksResult,
-        interactionsResult,
-        selfChecksResult,
+        observationRows,
+        definitionRows,
+        reframeRows,
+        feedbackRows,
+        interactionRows,
+        selfCheckRows,
       ] = await Promise.all([
-        client.from("observations").select("session_id, raw_text").in("session_id", ids),
-        client
-          .from("problem_definition_versions")
-          .select("id, session_id, version_number, text, author_type")
-          .in("session_id", ids),
+        // 페이지를 나눠 받는 이상 순서를 못 박아야 한다 — ORDER BY 없이 range를
+        // 겹쳐 요청하면 같은 행을 두 번 받거나 건너뛸 수 있다. 정렬 키는 각 표의 PK다.
+        fetchAllRows((from, to) =>
+          client
+            .from("observations")
+            .select("session_id, raw_text", { count: "exact" })
+            .in("session_id", ids)
+            .order("id")
+            .range(from, to),
+        ),
+        fetchAllRows((from, to) =>
+          client
+            .from("problem_definition_versions")
+            .select("id, session_id, version_number, text, author_type", {
+              count: "exact",
+            })
+            .in("session_id", ids)
+            .order("id")
+            .range(from, to),
+        ),
         // 개수만 필요하지만 PostgREST의 그룹 집계는 뷰가 필요하다 — id만 골라
         // 받아서 애플리케이션에서 센다(행당 uuid 하나라 전송량이 작다).
-        client.from("reframes").select("session_id, author_type").in("session_id", ids),
+        fetchAllRows((from, to) =>
+          client
+            .from("reframes")
+            .select("session_id, author_type", { count: "exact" })
+            .in("session_id", ids)
+            .order("id")
+            .range(from, to),
+        ),
         // 아래 3개가 품질 변화 지표(P1-5)의 원천이다. 전부 `in(session_id)` 배치라
         // 세션 수와 무관하게 쿼리 수는 그대로 상수로 유지된다.
-        client
-          .from("ai_feedbacks")
-          .select(
-            "session_id, problem_definition_version_id, dimensions, is_stale, created_at",
-          )
-          .in("session_id", ids),
-        client
-          .from("coach_interactions")
-          .select("session_id, hint_level")
-          .in("session_id", ids),
+        fetchAllRows((from, to) =>
+          client
+            .from("ai_feedbacks")
+            .select(
+              "session_id, problem_definition_version_id, dimensions, is_stale, created_at",
+              { count: "exact" },
+            )
+            .in("session_id", ids)
+            .order("id")
+            .range(from, to),
+        ),
+        fetchAllRows((from, to) =>
+          client
+            .from("coach_interactions")
+            .select("session_id, hint_level", { count: "exact" })
+            .in("session_id", ids)
+            .order("id")
+            .range(from, to),
+        ),
         // 자기 점검(feedback 단계)과 "혼자 해보기" 표식을 한 번에 가져온다.
-        client
-          .from("stage_responses")
-          .select("session_id, stage, prompt_key, content, is_draft")
-          .or(
-            `prompt_key.like.${SELF_ASSESSMENT_PROMPT_PREFIX}*,prompt_key.eq.${SOLO_MODE_PROMPT_KEY}`,
-          )
-          .in("session_id", ids),
+        fetchAllRows((from, to) =>
+          client
+            .from("stage_responses")
+            .select("session_id, stage, prompt_key, content, is_draft", {
+              count: "exact",
+            })
+            .or(
+              `prompt_key.like.${SELF_ASSESSMENT_PROMPT_PREFIX}*,prompt_key.eq.${SOLO_MODE_PROMPT_KEY}`,
+            )
+            .in("session_id", ids)
+            .order("id")
+            .range(from, to),
+        ),
       ]);
-      for (const result of [
-        observationsResult,
-        definitionsResult,
-        reframesResult,
-        feedbacksResult,
-        interactionsResult,
-        selfChecksResult,
-      ]) {
-        if (result.error) throw result.error;
-      }
 
       const observationBySession = new Map(
-        (observationsResult.data ?? []).map((row) => [row.session_id, row.raw_text]),
+        observationRows.map((row) => [row.session_id, row.raw_text]),
       );
 
       const latestDefinitionBySession = new Map<string, string>();
       const revisedSessions = new Set<string>();
       const latestVersionBySession = new Map<string, number>();
       const latestVersionIdBySession = new Map<string, string>();
-      for (const row of definitionsResult.data ?? []) {
+      for (const row of definitionRows) {
         const seen = latestVersionBySession.get(row.session_id) ?? 0;
         if (row.version_number > seen) {
           latestVersionBySession.set(row.session_id, row.version_number);
@@ -371,7 +399,7 @@ export function createSupabaseSessionRepository(
       // stale이 된 피드백을 "그때는 좋았다"로 세면 추이가 거짓이 된다.
       const dimensionsBySession = new Map<string, Record<string, AIFeedbackDimension>>();
       const feedbackCreatedAt = new Map<string, string>();
-      for (const row of feedbacksResult.data ?? []) {
+      for (const row of feedbackRows) {
         if (row.is_stale) continue;
         if (
           row.problem_definition_version_id !==
@@ -389,7 +417,7 @@ export function createSupabaseSessionRepository(
       }
 
       const hintLevelsBySession = new Map<string, HintLevel[]>();
-      for (const row of interactionsResult.data ?? []) {
+      for (const row of interactionRows) {
         const list = hintLevelsBySession.get(row.session_id) ?? [];
         list.push(row.hint_level as HintLevel);
         hintLevelsBySession.set(row.session_id, list);
@@ -397,7 +425,7 @@ export function createSupabaseSessionRepository(
 
       const selfChecksBySession = new Map<string, SelfCheckRow[]>();
       const soloModeSessions = new Set<string>();
-      for (const row of selfChecksResult.data ?? []) {
+      for (const row of selfCheckRows) {
         if (row.prompt_key === SOLO_MODE_PROMPT_KEY) {
           if (!row.is_draft) soloModeSessions.add(row.session_id);
           continue;
@@ -408,7 +436,7 @@ export function createSupabaseSessionRepository(
       }
 
       const userReframeCounts = new Map<string, number>();
-      for (const row of reframesResult.data ?? []) {
+      for (const row of reframeRows) {
         if (row.author_type !== "user") continue;
         userReframeCounts.set(
           row.session_id,

@@ -10,6 +10,12 @@ import { requireSupabaseEnv } from "./env";
  * 화면에 머물러야 하므로 이 리다이렉트 대상에서 제외한다.
  */
 const PUBLIC_PREFIXES = ["/onboarding", "/auth", "/offline"];
+
+/**
+ * 온보딩을 이미 봤다는 표시. 보안 경계가 아니라 화면 흐름용이라 쿠키로 충분하다
+ * (지웠다고 해서 잃는 것은 없다 — 소개 화면을 한 번 더 볼 뿐이다).
+ */
+const ONBOARDING_SEEN_COOKIE = "onboarding_seen";
 const REDIRECT_IF_AUTHED_PATHS = ["/auth/login", "/auth/signup"];
 
 function isPublicPath(pathname: string): boolean {
@@ -89,6 +95,16 @@ export async function updateSession(request: NextRequest) {
         { status: 401 },
       );
     }
+    // 처음 오는 사람은 로그인 폼이 아니라 소개 화면부터 본다(DESIGN.md §10.1 S-01,
+    // PRD F-01). 이 화면은 만들어져 있었지만 **어디서도 연결되지 않아 도달할 수
+    // 없었다** — URL을 직접 치는 사람만 볼 수 있었다.
+    //
+    // 루트로 들어온 경우에만 그렇게 한다. `/history` 같은 깊은 링크를 타고 온
+    // 사람은 갈 곳이 분명하므로 로그인으로 보내고 `next`로 되돌려준다.
+    if (pathname === "/" && !request.cookies.get(ONBOARDING_SEEN_COOKIE)) {
+      return NextResponse.redirect(new URL("/onboarding", request.url));
+    }
+
     const loginUrl = new URL("/auth/login", request.url);
     loginUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(loginUrl);

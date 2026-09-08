@@ -4,6 +4,18 @@ import { useState } from "react";
 import { Button, LinkButton, Stack } from "@/components/ui";
 
 /**
+ * 온보딩을 봤다는 표시. 미들웨어가 이 쿠키를 보고 처음 오는 사람만 이 화면으로
+ * 보낸다(`lib/supabase/middleware.ts`).
+ *
+ * 보안 경계가 아니라 화면 흐름용이라 클라이언트에서 세우는 쿠키로 충분하다 —
+ * 지워도 잃는 것이 없고, 소개 화면을 한 번 더 볼 뿐이다. 그래서 httpOnly가 아니다.
+ */
+function markOnboardingSeen(): void {
+  const oneYear = 60 * 60 * 24 * 365;
+  document.cookie = `onboarding_seen=1; path=/; max-age=${oneYear}; samesite=lax`;
+}
+
+/**
  * S-01 Onboarding (DESIGN.md §10.1).
  *
  * 예전에는 한 화면에 첫 문구만 있었다. DESIGN.md가 정한 구성(진행 Dot → Symbol →
@@ -88,7 +100,12 @@ export default function OnboardingPage() {
       <div className="px-6 pb-6">
         <Stack gap={2}>
           {isLast ? (
-            <LinkButton href="/auth/login" variant="primary" fullWidth>
+            <LinkButton
+              href="/auth/login"
+              variant="primary"
+              fullWidth
+              onClick={markOnboardingSeen}
+            >
               시작하기
             </LinkButton>
           ) : (
@@ -107,7 +124,12 @@ export default function OnboardingPage() {
             회원가입 Form을 중심에 두지 않는다"만 요구하고 Skip은 막지 않는다.
           */}
           {!isLast && (
-            <LinkButton href="/auth/login" variant="tertiary" fullWidth>
+            <LinkButton
+              href="/auth/login"
+              variant="tertiary"
+              fullWidth
+              onClick={markOnboardingSeen}
+            >
               건너뛰기
             </LinkButton>
           )}

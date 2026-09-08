@@ -30,10 +30,10 @@ describe("runCoachGuardrails — 정상 응답", () => {
 });
 
 describe("runCoachGuardrails — 위반 감지", () => {
-  it("coachMessage에 물음표가 또 있으면 복수 질문 위반", () => {
+  it("coachMessage에 물음표가 또 있으면 위반 — 질문 자리가 둘이 된다", () => {
     const result = runCoachGuardrails(MULTIPLE_QUESTIONS_OUTPUT, baseContext);
     expect(result.ok).toBe(false);
-    expect(result.violations).toContain("multiple_questions");
+    expect(result.violations).toContain("question_mark_in_message");
   });
 
   /**
@@ -140,7 +140,7 @@ describe("runCoachGuardrails — 위반 감지", () => {
       { ...MULTIPLE_QUESTIONS_OUTPUT, evidenceReferences: ["없는 문구"] },
       baseContext,
     );
-    expect(result.violations).toContain("multiple_questions");
+    expect(result.violations).toContain("question_mark_in_message");
     expect(result.violations).toContain("unverified_evidence");
   });
 });
@@ -413,12 +413,12 @@ describe("checkSingleQuestion — 한 번에 하나만", () => {
     expect(violations(question)).toContain("multiple_questions");
   });
 
-  it("coachMessage에 물음표가 있어도 막는다 — 그러면 질문이 둘이 된다", () => {
+  it("coachMessage에 물음표가 있으면 다른 코드로 막는다 — 원인이 다르면 고칠 곳도 다르다", () => {
     const result = runCoachGuardrails(
       { ...base, coachMessage: "그게 정말인가요?", question: "무엇이 달랐나요?" },
       context,
     );
-    expect(result.violations).toContain("multiple_questions");
+    expect(result.violations).toContain("question_mark_in_message");
   });
 
   it("접속사로 이어붙인 두 질문은 세지 못한다 — 프롬프트가 맡는 경계다", () => {
@@ -426,5 +426,59 @@ describe("checkSingleQuestion — 한 번에 하나만", () => {
     expect(violations("왜 그렇게 보셨고, 무엇이 근거였나요?")).not.toContain(
       "multiple_questions",
     );
+  });
+});
+
+/**
+ * 반복 질문 검사. 원래는 완전히 같은 문장만 잡았고, 실제 제공자로 10번 재보니
+ * 글자 몇 개만 다른 질문이 연달아 정상 응답으로 저장됐다 — 사용자 입장에서는 같은
+ * 질문을 두 번 받은 것이다.
+ */
+describe("checkNotRepeated — 같은 질문을 두 번 주지 않는다", () => {
+  const base = {
+    currentStage: "questioning" as const,
+    action: "ask" as const,
+    coachMessage: "조금 더 봅시다.",
+    detectedGaps: [],
+    evidenceReferences: [],
+    hintLevel: 0 as const,
+    suggestedNextStage: null,
+    safetyFlags: [],
+  };
+  const repeated = (question: string, recentQuestions: string[]) =>
+    runCoachGuardrails(
+      { ...base, question },
+      {
+        currentStage: "questioning",
+        userText: "회의 때마다 한 사람이 늦게 들어온다",
+        recentQuestions,
+      },
+    ).violations.includes("repeated_question");
+
+  it("완전히 같은 질문은 막는다", () => {
+    expect(repeated("그때 무슨 일이 있었나요?", ["그때 무슨 일이 있었나요?"])).toBe(true);
+  });
+
+  it("글자 몇 개만 다른 질문도 막는다 — 실제 제공자에서 나온 쌍이다", () => {
+    const before = "지금 떠올리신 '이 사람'과 '늦는 상황'은 각각 무엇을 가리키나요?";
+    const after = "지금 말씀하신 '이 사람'과 '늦는 상황'은 각각 무엇을 가리키나요?";
+    expect(repeated(after, [before])).toBe(true);
+  });
+
+  it("서로 다른 질문은 통과한다", () => {
+    expect(
+      repeated("다른 사람에게 물어본다면 무엇을 먼저 묻고 싶나요?", [
+        "이 사람이 늦는다고 느끼는 장면에서 다른 사람들은 어땠나요?",
+      ]),
+    ).toBe(false);
+  });
+
+  it("짧은 질문은 유사도를 믿지 않는다 — 한 글자 차이가 크게 흔들린다", () => {
+    // "언제"와 "어디"는 명백히 다른 질문인데 유사도가 0.5까지 나온다.
+    expect(repeated("그 장면은 어디였나요?", ["그 장면은 언제였나요?"])).toBe(false);
+  });
+
+  it("최근 질문이 없으면 무엇이든 통과한다", () => {
+    expect(repeated("그때 무슨 일이 있었나요?", [])).toBe(false);
   });
 });

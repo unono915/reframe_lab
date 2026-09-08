@@ -11,7 +11,10 @@ import type { FeedbackOutputSchema } from "@/lib/schemas/feedback-output";
  */
 
 export type GuardrailErrorCode =
+  /** `question` 필드 안에 물음표가 둘 이상 — 한 번에 여러 개를 물었다. */
   | "multiple_questions"
+  /** `coachMessage`에 물음표가 있다 — 질문 자리가 둘이 된다. 원인이 달라 코드를 나눈다. */
+  | "question_mark_in_message"
   | "missing_question"
   | "unverified_evidence"
   | "fabricated_fact"
@@ -47,10 +50,13 @@ const QUESTION_MARK_PATTERN = /[?？]/;
  * 물음표 없이 접속사로 이어붙인 경우("왜 그렇게 보셨고, 무엇이 근거였나요?")는
  * 어휘로 세기 어렵다. 그건 프롬프트가 맡는다.
  */
-function checkSingleQuestion(output: CoachOutputSchema): boolean {
-  if (output.question === null) return true;
-  if (QUESTION_MARK_PATTERN.test(output.coachMessage)) return false;
-  return (output.question.match(/[?？]/g) ?? []).length <= 1;
+function checkSingleQuestion(output: CoachOutputSchema): GuardrailErrorCode | null {
+  if (output.question === null) return null;
+  // 두 원인을 따로 돌려준다 — 기록에 남는 코드가 다르면 다음에 무엇을 고쳐야 할지
+  // 알 수 있다(프롬프트의 coachMessage 규칙인지, question 필드 규칙인지).
+  if (QUESTION_MARK_PATTERN.test(output.coachMessage)) return "question_mark_in_message";
+  if ((output.question.match(/[?？]/g) ?? []).length > 1) return "multiple_questions";
+  return null;
 }
 
 /**
@@ -246,10 +252,59 @@ function checkValidNextStage(output: CoachOutputSchema, currentStage: Stage): bo
   return output.suggestedNextStage === nextStageOf(currentStage);
 }
 
-/** 8. 반복 질문 검사 — 최근 질문과 완전히 같은 문장이면 위반(단순 임계값). */
+/**
+ * 8. 반복 질문 검사.
+ *
+ * 원래는 **완전히 같은 문장**만 잡았다. 실제 제공자로 10번 재보니, 글자 몇 개만 다른
+ * 질문이 연달아 나와도 그대로 통과했다 — "지금 **떠올리신** '이 사람'과…"와
+ * "지금 **말씀하신** '이 사람'과…"가 각각 정상 응답으로 저장됐다. 사용자 입장에서는
+ * 같은 질문을 두 번 받은 것이다.
+ *
+ * 그래서 문자 bigram 자카드 유사도로 본다. 실측값이 잘 갈렸다 — 위 근사 중복은
+ * 0.758, 서로 다른 질문은 0.13~0.17이었다.
+ *
+ * 다만 **짧은 문장에서는 이 값이 무의미하다.** "그 장면은 언제였나요?"와 "…어디였나요?"는
+ * 명백히 다른 질문인데 0.50이 나온다(bigram이 몇 개 없어 한 글자 차이가 크게 흔들린다).
+ * 그래서 짧은 질문은 예전처럼 완전 일치만 본다.
+ *
+ * 걸리면 곧바로 fallback이 아니라 **재시도 한 번**이 먼저다(Route Handler). 다시
+ * 뽑으면 대개 다른 질문이 나오므로, 이 검사는 사용자에게 새 질문을 줄 기회를 만든다.
+ */
+const REPEAT_SIMILARITY_THRESHOLD = 0.72;
+/** 이보다 짧으면 유사도를 신뢰하지 않고 완전 일치만 본다(정규화 후 글자 수). */
+const REPEAT_SIMILARITY_MIN_LENGTH = 20;
+
+function characterBigrams(text: string): Set<string> {
+  const normalized = normalize(text);
+  const grams = new Set<string>();
+  for (let i = 0; i < normalized.length - 1; i += 1) {
+    grams.add(normalized.slice(i, i + 2));
+  }
+  return grams;
+}
+
+function similarity(a: string, b: string): number {
+  const left = characterBigrams(a);
+  const right = characterBigrams(b);
+  if (left.size === 0 || right.size === 0) return normalize(a) === normalize(b) ? 1 : 0;
+  let shared = 0;
+  for (const gram of left) if (right.has(gram)) shared += 1;
+  return shared / (left.size + right.size - shared);
+}
+
+function isRepeat(previous: string, candidate: string): boolean {
+  if (normalize(previous) === normalize(candidate)) return true;
+  const tooShort =
+    normalize(previous).length < REPEAT_SIMILARITY_MIN_LENGTH ||
+    normalize(candidate).length < REPEAT_SIMILARITY_MIN_LENGTH;
+  if (tooShort) return false;
+  return similarity(previous, candidate) >= REPEAT_SIMILARITY_THRESHOLD;
+}
+
 function checkNotRepeated(output: CoachOutputSchema, recentQuestions: string[]): boolean {
   if (output.question === null) return true;
-  return !recentQuestions.some((q) => normalize(q) === normalize(output.question ?? ""));
+  const candidate = output.question;
+  return !recentQuestions.some((q) => isRepeat(q, candidate));
 }
 
 function normalize(text: string): string {
@@ -262,7 +317,8 @@ export function runCoachGuardrails(
 ): GuardrailResult {
   const violations: GuardrailErrorCode[] = [];
 
-  if (!checkSingleQuestion(output)) violations.push("multiple_questions");
+  const questionCountViolation = checkSingleQuestion(output);
+  if (questionCountViolation) violations.push(questionCountViolation);
   if (!checkAskHasQuestion(output)) violations.push("missing_question");
 
   const evidence = checkEvidence(output, context.userText);

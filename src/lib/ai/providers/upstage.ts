@@ -66,8 +66,18 @@ const COACH_JSON_SCHEMA = {
   properties: {
     currentStage: { type: "string", enum: STAGE_ENUM },
     action: { type: "string", enum: ACTION_ENUM },
-    coachMessage: { type: "string" },
-    question: { type: ["string", "null"] },
+    // 모델이 값을 **만드는 자리**에 제약을 둔다. 프롬프트에도 같은 규칙이 있지만,
+    // 실측에서 복합 질문("언제였나요? 어디였나요?")이 그대로 나왔다 — 규칙이 멀리
+    // 있으면 지켜지지 않는다. 원칙 2는 이 앱의 핵심 제약이라 두 곳 모두에 적는다.
+    coachMessage: {
+      type: "string",
+      description: "질문 앞에 붙일 짧은 코멘트. 물음표를 쓰지 않습니다.",
+    },
+    question: {
+      type: ["string", "null"],
+      description:
+        "사용자에게 물어볼 질문 하나. 물음표는 정확히 한 개만 씁니다. 두 가지를 함께 묻지 말고 더 중요한 하나만 고르세요. 물어볼 것이 없으면 null.",
+    },
     detectedGaps: {
       type: "array",
       maxItems: 5,
@@ -219,7 +229,7 @@ function buildCoachUserPrompt(
       : "";
 
   return `[출력 필드 설명]
-- question: 사용자에게 물어볼 질문 단 하나. 물어볼 것이 없으면 null.
+- question: 사용자에게 물어볼 질문 하나. **물음표(?)는 정확히 한 개만** 씁니다. 두 가지가 궁금하더라도 더 중요한 하나만 고르세요. 물어볼 것이 없으면 null.
 - coachMessage: question 앞에 붙일 짧은 코멘트(있다면). 여기에는 물음표를 쓰지 마세요 — 질문은 question 필드에만 담습니다.
 - evidenceReferences: coachMessage에서 근거를 언급했다면, 아래 [사용자 입력]에 실제로 등장하는 부분 문자열만 그대로 담으세요. 없으면 빈 배열.
 - detectedGaps: 이 단계에서 아직 채워지지 않은 항목(있는 만큼만, 최대 5개).

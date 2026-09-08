@@ -37,6 +37,7 @@ import {
 } from "@/lib/persistence/drafts";
 import { findConflictingDrafts } from "@/lib/persistence/reconciliation";
 import { handleUnauthorized, toDisplayMessage, UserFacingError } from "@/lib/fetch-json";
+import { trackedFetch } from "@/lib/network-status";
 import type { MutateAction } from "@/lib/schemas/mutate-actions";
 import type {
   explorationPromptKeySchema,
@@ -217,11 +218,14 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
       enqueue(async () => {
         const current = snapshotRef.current;
         if (!current) return null;
-        const response = await fetch(`/api/sessions/${current.session.id}/mutate`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ clientRequestId: crypto.randomUUID(), mutation }),
-        });
+        const response = await trackedFetch(
+          `/api/sessions/${current.session.id}/mutate`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ clientRequestId: crypto.randomUUID(), mutation }),
+          },
+        );
         const body = await parseJsonSafe<
           { snapshot: TrainingSessionSnapshot } & Partial<ApiErrorBody>
         >(response);
@@ -271,14 +275,17 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
           debouncedSaveRef.current.cancelPending();
         }
 
-        const response = await fetch(`/api/sessions/${current.session.id}/${endpoint}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            expectedStateVersion: current.session.stateVersion,
-            clientRequestId: crypto.randomUUID(),
-          }),
-        });
+        const response = await trackedFetch(
+          `/api/sessions/${current.session.id}/${endpoint}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              expectedStateVersion: current.session.stateVersion,
+              clientRequestId: crypto.randomUUID(),
+            }),
+          },
+        );
         const body = await parseJsonSafe<
           { snapshot: TrainingSessionSnapshot } & Partial<ApiErrorBody>
         >(response);
@@ -329,7 +336,7 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     async function loadTemplateFor(session: TrainingSessionSnapshot["session"]) {
-      const res = await fetch("/api/templates");
+      const res = await trackedFetch("/api/templates");
       const body = await parseJsonSafe<{ templates: TrainingTemplate[] }>(res);
       return body?.templates.find((t) => t.id === session.templateId) ?? null;
     }
@@ -337,7 +344,7 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
     async function init() {
       dispatch({ type: "loading" });
       try {
-        const activeRes = await fetch("/api/sessions?status=active");
+        const activeRes = await trackedFetch("/api/sessions?status=active");
         const activeBody = await parseJsonSafe<{
           snapshot: TrainingSessionSnapshot | null;
         }>(activeRes);
@@ -345,13 +352,13 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
 
         if (!snapshot) {
           const timezone = timezoneRef.current;
-          const todayRes = await fetch(
+          const todayRes = await trackedFetch(
             `/api/templates/today?timezone=${encodeURIComponent(timezone)}`,
           );
           const todayBody = await parseJsonSafe<{ template: TrainingTemplate }>(todayRes);
           if (!todayBody) throw new UserFacingError("오늘의 렌즈를 불러오지 못했어요.");
 
-          const createRes = await fetch("/api/sessions", {
+          const createRes = await trackedFetch("/api/sessions", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -371,14 +378,17 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
           snapshot = createBody.snapshot;
         } else if (snapshot.session.status === "paused") {
           // /training 진입 자체가 "이어서 하기" 행동이다.
-          const resumeRes = await fetch(`/api/sessions/${snapshot.session.id}/resume`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              expectedStateVersion: snapshot.session.stateVersion,
-              clientRequestId: crypto.randomUUID(),
-            }),
-          });
+          const resumeRes = await trackedFetch(
+            `/api/sessions/${snapshot.session.id}/resume`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                expectedStateVersion: snapshot.session.stateVersion,
+                clientRequestId: crypto.randomUUID(),
+              }),
+            },
+          );
           const resumeBody = await parseJsonSafe<{ snapshot: TrainingSessionSnapshot }>(
             resumeRes,
           );
@@ -547,7 +557,7 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
       enqueue(async () => {
         const current = snapshotRef.current;
         if (!current) return { ok: false, message: "세션이 아직 준비되지 않았습니다." };
-        const response = await fetch(`/api/sessions/${current.session.id}/coach`, {
+        const response = await trackedFetch(`/api/sessions/${current.session.id}/coach`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ hintLevel, clientRequestId: crypto.randomUUID() }),
@@ -588,11 +598,14 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
       enqueue(async () => {
         const current = snapshotRef.current;
         if (!current) return { ok: false, message: "세션이 아직 준비되지 않았습니다." };
-        const response = await fetch(`/api/sessions/${current.session.id}/feedback`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ clientRequestId: crypto.randomUUID() }),
-        });
+        const response = await trackedFetch(
+          `/api/sessions/${current.session.id}/feedback`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ clientRequestId: crypto.randomUUID() }),
+          },
+        );
         const body = await parseJsonSafe<
           | { feedback: AIFeedback; snapshot: TrainingSessionSnapshot }
           | { errorCode: string; message: string }

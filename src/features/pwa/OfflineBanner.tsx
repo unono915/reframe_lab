@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
+import { isOffline, subscribeNetworkStatus } from "@/lib/network-status";
 
 /**
  * 연결이 끊겼을 때 알려주는 배너 (DESIGN.md §11 "Offline Draft", §17.3 Status Banner
@@ -15,26 +16,17 @@ import { usePathname } from "next/navigation";
  * 사용자가 정한다 — `reloadOnOnline`을 끈 것과 같은 이유다(작성 중인 세션이 강제로
  * 새로고침되면 안 된다, 원칙 7).
  *
- * `navigator.onLine`은 "네트워크 인터페이스가 붙어 있는가"만 알려주므로 캡티브 포털
- * 같은 경우를 잡지 못한다. 그런 경우는 저장 실패 문구가 받아낸다 — 이 배너는 확실히
- * 끊긴 경우를 미리 알려주는 용도이지, 연결 품질의 유일한 판단 근거가 아니다.
+ * **`navigator.onLine`만 보지 않는다.** 그 값은 브라우저가 네트워크 인터페이스를
+ * 어떻게 보는지일 뿐이라, 요청이 전부 죽는데도 `true`인 경우가 실제로 있었다
+ * (2026-09-08, 오프라인 상태로 앱을 연 뒤 측정). 캡티브 포털도 같은 모양이다.
+ * 그래서 `lib/network-status.ts`가 브라우저의 신고와 **실제 요청 결과**를 함께 보고
+ * 판단한다 — 추측보다 관측이 정확하다.
  */
 export function OfflineBanner() {
-  // 서버 렌더 시점에는 알 수 없다. 초기값을 online으로 두어 hydration 불일치를 피하고,
-  // 실제 값은 마운트 후 이벤트로 맞춘다.
-  const [offline, setOffline] = useState(false);
+  // 서버에는 네트워크 상태가 없으므로 서버 스냅샷은 항상 false다 — 그래야
+  // hydration이 어긋나지 않는다. 실제 값은 클라이언트에서 구독으로 채워진다.
+  const offline = useSyncExternalStore(subscribeNetworkStatus, isOffline, () => false);
   const pathname = usePathname();
-
-  useEffect(() => {
-    const sync = () => setOffline(!navigator.onLine);
-    sync();
-    window.addEventListener("online", sync);
-    window.addEventListener("offline", sync);
-    return () => {
-      window.removeEventListener("online", sync);
-      window.removeEventListener("offline", sync);
-    };
-  }, []);
 
   if (!offline) return null;
 

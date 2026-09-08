@@ -1,3 +1,5 @@
+import { trackedFetch } from "./network-status";
+
 /**
  * 화면(app/**, features/**)이 Route Handler를 호출할 때 쓰는 공용 래퍼.
  *
@@ -92,7 +94,10 @@ export async function fetchJson<T>(
 ): Promise<FetchResult<T>> {
   let response: Response;
   try {
-    response = await fetch(input, init);
+    // trackedFetch를 쓰는 이유: 실패·성공을 오프라인 배너가 함께 본다. 브라우저의
+    // `navigator.onLine`만으로는 "인터페이스는 붙어 있는데 요청은 죽는" 경우를
+    // 놓친다(lib/network-status.ts).
+    response = await trackedFetch(input, init);
   } catch {
     // fetch가 reject하는 경우는 사실상 네트워크 단절뿐이다(CORS·중단 포함).
     return { ok: false, message: NETWORK_ERROR_MESSAGE };

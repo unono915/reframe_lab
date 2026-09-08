@@ -23,6 +23,27 @@ test.skip(
   "E2E_TEST_EMAIL/PASSWORD 미설정 — 로그인 필요한 E2E는 건너뜀 (.env.example 참고)",
 );
 
+/** 이 기기(IndexedDB)에 남아 있는 그 세션의 초안 개수. */
+async function draftCount(
+  page: import("@playwright/test").Page,
+  sessionId: string,
+): Promise<number> {
+  return page.evaluate(async (id) => {
+    const open = indexedDB.open("reframe-lab-drafts");
+    const db = await new Promise<IDBDatabase | null>((resolve) => {
+      open.onsuccess = () => resolve(open.result);
+      open.onerror = () => resolve(null);
+    });
+    if (!db || !db.objectStoreNames.contains("drafts")) return 0;
+    const request = db.transaction("drafts", "readonly").objectStore("drafts").getAll();
+    const rows = await new Promise<unknown[]>((resolve) => {
+      request.onsuccess = () => resolve(request.result as unknown[]);
+      request.onerror = () => resolve([]);
+    });
+    return rows.filter((row) => (row as { sessionId?: string }).sessionId === id).length;
+  }, sessionId);
+}
+
 test.beforeEach(async ({ request }) => {
   await resetActiveSession(request);
 });
@@ -76,21 +97,39 @@ test("여기서 그만두면 기록은 남고, 다음 훈련을 새로 시작할
     지우는 것뿐이었다.
   */
   await page.goto("/training/new");
-  await fillStagesUntilQuestioning(page);
+  await expect(page.getByText("1 / 7 관찰")).toBeVisible();
   await settle(page);
-  const sessionId = (page.url().split("/training/")[1] ?? "").split("?")[0];
+
+  /*
+    다음으로 넘어가지 않고 관찰만 써둔다 — 이 상태의 문장은 서버가 아니라 이 기기에만
+    있다(디바운스 500ms 뒤 IndexedDB에 저장된다). 그만두기가 그것까지 지우는지가
+    이 테스트의 요점이라, 먼저 **실제로 남아 있는지**부터 확인한다.
+  */
+  await page.getByLabel("관찰한 장면").fill(DEFAULT_CONTENT.observation);
+  const sessionId = (page.url().split("/training/")[1] ?? "").split("?")[0] ?? "";
+  expect(sessionId).toBeTruthy();
+  await expect
+    .poll(() => draftCount(page, sessionId), { timeout: 5000 })
+    .toBeGreaterThan(0);
 
   await page.goto(`/result/${sessionId}`);
   await page.getByRole("button", { name: "여기서 그만두기" }).click();
   await page.getByRole("button", { name: "그만두기", exact: true }).click();
 
-  // 기록은 남는다 — 지운 것이 아니다.
+  // 기록은 남는다 — 지운 것이 아니다(이 세션은 관찰을 아직 서버에 확정하지 않은
+  // 상태라 본문은 비어 있지만, 기록 자체와 상태는 남아야 한다).
   await expect(page.getByText("중단됨")).toBeVisible();
-  await expect(page.getByText(DEFAULT_CONTENT.observation)).toBeVisible();
+  await expect(page.getByRole("button", { name: "기록 목록" })).toBeVisible();
   // 되살릴 수 없는 상태이므로 이어서 하기는 사라진다.
   await expect(page.getByRole("button", { name: "이어서 하기" })).toHaveCount(0);
 
   // 활성 세션이 비었으니 새 훈련을 시작할 수 있다 — 이것이 이 경로의 요점이다.
   const active = await request.get("/api/sessions?status=active");
   expect(((await active.json()) as { snapshot: unknown }).snapshot).toBeNull();
+
+  /*
+    기기에 남은 초안도 함께 지운다. 이어서 할 수 없게 된 세션의 초안은 쓸 곳이 없고,
+    사용자는 그만둔 글이 기기에 남아 있으리라 생각하지 않는다.
+  */
+  expect(await draftCount(page, sessionId)).toBe(0);
 });

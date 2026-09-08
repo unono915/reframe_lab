@@ -24,6 +24,7 @@ import {
   overconfidentDimensions,
 } from "@/domain/training/self-assessment";
 import { fetchJson } from "@/lib/fetch-json";
+import { clearSessionDrafts } from "@/lib/persistence/drafts";
 
 function detectTimezone(): string {
   try {
@@ -179,6 +180,14 @@ export default function ResultPage() {
       setActionError(result.message);
       return;
     }
+    /*
+      기기에 남은 초안까지 지운다. 진행 중이던 기록을 지우면 서버에서는 사라지는데
+      이 기기의 IndexedDB에는 그때 쓰던 문장이 그대로 남아 있었다 — 사용자는 지웠다고
+      생각하는 글이다. 로그아웃 때 응답 캐시를 비우는 것과 같은 이유다.
+
+      실패해도 삭제 자체는 이미 끝났으므로 흐름을 막지 않는다.
+    */
+    await clearSessionDrafts(snapshot.session.id).catch(() => undefined);
     router.push("/history");
   }
 
@@ -213,6 +222,8 @@ export default function ResultPage() {
     }
     setConfirmingAbandon(false);
     setSnapshot(result.data.snapshot);
+    // 이어서 할 수 없게 된 세션의 초안은 쓸 곳이 없다 — 기기에 남겨둘 이유도 없다.
+    await clearSessionDrafts(result.data.snapshot.session.id).catch(() => undefined);
   }
 
   if (pageError) {

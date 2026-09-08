@@ -124,7 +124,7 @@ export function ReframingStage() {
               <p className="text-caption font-bold text-brand-strong">
                 {PERSPECTIVE_LENS_LABELS[p.lensType]}
               </p>
-              <p className="text-body text-ink">{p.content}</p>
+              <p className="whitespace-pre-line text-body text-ink">{p.content}</p>
             </Card>
           ))}
         </Stack>
@@ -136,7 +136,7 @@ export function ReframingStage() {
               <p className="text-label font-bold text-text-secondary">
                 다른 관점 {i + 1}
               </p>
-              <p className="text-body text-ink">{r.text}</p>
+              <p className="whitespace-pre-line text-body text-ink">{r.text}</p>
             </Card>
           ))}
           <Field

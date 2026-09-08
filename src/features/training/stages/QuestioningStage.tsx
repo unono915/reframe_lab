@@ -112,7 +112,7 @@ export function QuestioningStage() {
                 <p className="text-label font-bold text-text-secondary">
                   질문 {index + 1}
                 </p>
-                <p className="text-body text-ink">{q.text}</p>
+                <p className="whitespace-pre-line text-body text-ink">{q.text}</p>
                 {q.isPriority ? (
                   <p className="text-caption text-brand-strong">
                     핵심 질문 · {q.priorityReason}

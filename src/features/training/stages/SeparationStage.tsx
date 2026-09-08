@@ -86,7 +86,9 @@ export function SeparationStage() {
         {snapshot.observation && (
           <Card variant="paper">
             <p className="text-label font-bold text-brand-strong">내가 쓴 문장</p>
-            <p className="text-body text-ink">{snapshot.observation.rawText}</p>
+            <p className="whitespace-pre-line text-body text-ink">
+              {snapshot.observation.rawText}
+            </p>
           </Card>
         )}
 
@@ -98,7 +100,7 @@ export function SeparationStage() {
                   <p className="text-caption font-bold text-text-secondary">
                     {ITEM_TYPE_LABELS[item.type]}
                   </p>
-                  <p className="text-body text-ink">{item.text}</p>
+                  <p className="whitespace-pre-line text-body text-ink">{item.text}</p>
                 </Stack>
                 <Button
                   type="button"

@@ -133,3 +133,35 @@ test("여기서 그만두면 기록은 남고, 다음 훈련을 새로 시작할
   */
   expect(await draftCount(page, sessionId)).toBe(0);
 });
+
+test("여러 줄로 쓴 관찰이 기록에서도 여러 줄로 보인다", async ({ page }) => {
+  /*
+    관찰 입력은 여러 줄을 받는 textarea이고, 안내 문구도 "언제, 어디서, 무엇이"라고
+    여러 가지를 묻는다 — 줄을 나눠 쓰는 것이 자연스러운 자리다. 그런데 기록 화면은
+    그 문장을 `<p>`에 그대로 넣어서 HTML이 줄바꿈을 접어버렸다. 두 주 뒤에 열면 자기가
+    나눠 쓴 글이 한 덩어리로 붙어 있다 — 기록은 쓴 그대로 보여야 한다.
+  */
+  const multiline = [
+    "월요일 회의에서",
+    "한 사람이 10분 늦게 들어왔다",
+    "아무도 언급하지 않았다",
+  ].join(String.fromCharCode(10));
+
+  await page.goto("/training/new");
+  await expect(page.getByText("1 / 7 관찰")).toBeVisible();
+  await settle(page);
+  await page.getByLabel("관찰한 장면").fill(multiline);
+  await page.getByRole("button", { name: "다음 질문으로" }).click();
+  await expect(page.getByText("2 / 7 구분")).toBeVisible();
+
+  const sessionId = (page.url().split("/training/")[1] ?? "").split("?")[0] ?? "";
+  await page.goto(`/result/${sessionId}`);
+
+  const rendered = page.getByText("월요일 회의에서", { exact: false }).first();
+  await expect(rendered).toBeVisible();
+  // 실제로 세 줄로 그려지는지 — 접혔다면 한 줄로 온다.
+  const text = await rendered.innerText();
+  expect(text.split(String.fromCharCode(10)).filter((line) => line.trim()).length).toBe(
+    3,
+  );
+});

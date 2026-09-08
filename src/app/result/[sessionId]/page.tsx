@@ -369,7 +369,7 @@ export default function ResultPage() {
         <Card variant="paper">
           <Stack gap={2}>
             <p className="text-label font-bold text-brand-strong">현재의 문제 정의</p>
-            <p className="text-body-lg text-ink">{latest.text}</p>
+            <p className="whitespace-pre-line text-body-lg text-ink">{latest.text}</p>
             <Stack direction="row" gap={2} align="center">
               <p className="text-caption text-text-secondary">v{latest.versionNumber}</p>
               <AuthorBadge authorType={latest.authorType} />
@@ -383,13 +383,13 @@ export default function ResultPage() {
           <p className="text-heading-3 font-bold text-ink">처음 생각과 지금 생각</p>
           <Card variant="neutral">
             <p className="text-label font-bold text-text-secondary">처음 생각 (v1)</p>
-            <p className="text-body text-ink">{first.text}</p>
+            <p className="whitespace-pre-line text-body text-ink">{first.text}</p>
           </Card>
           <Card variant="cream">
             <p className="text-label font-bold text-brand-strong">
               지금 생각 (v{latest.versionNumber})
             </p>
-            <p className="text-body text-ink">{latest.text}</p>
+            <p className="whitespace-pre-line text-body text-ink">{latest.text}</p>
             {latest.changeReason &&
               (latest.changeReason === PAST_STAGE_EDIT_REASON ? (
                 // 앱이 남긴 메모다. 사용자가 쓴 이유와 같은 라벨을 달면, 두 주 뒤에
@@ -427,7 +427,7 @@ export default function ResultPage() {
             <p className="text-label font-bold text-brand-strong">
               이번에 다시 생각한 정의 ({snapshot.session.trainingDate})
             </p>
-            <p className="text-body text-ink">{latest.text}</p>
+            <p className="whitespace-pre-line text-body text-ink">{latest.text}</p>
           </Card>
         </Stack>
       )}
@@ -444,7 +444,9 @@ export default function ResultPage() {
               {exceptionReasons.map((reason) => (
                 <div key={reason.stage}>
                   <Badge variant="neutral">{stageLabel(reason.stage)}</Badge>
-                  <p className="mt-1 text-body text-ink">{reason.content}</p>
+                  <p className="whitespace-pre-line mt-1 text-body text-ink">
+                    {reason.content}
+                  </p>
                 </div>
               ))}
               <p className="text-caption text-text-tertiary">
@@ -458,7 +460,9 @@ export default function ResultPage() {
           <Card variant="paper">
             <Stack gap={2}>
               <p className="text-label font-bold text-text-secondary">관찰</p>
-              <p className="text-body text-ink">{snapshot.observation.rawText}</p>
+              <p className="whitespace-pre-line text-body text-ink">
+                {snapshot.observation.rawText}
+              </p>
             </Stack>
           </Card>
         )}
@@ -469,7 +473,7 @@ export default function ResultPage() {
               <p className="text-label font-bold text-text-secondary">구분</p>
               <Stack gap={1}>
                 {confirmedItems.map((item) => (
-                  <p key={item.id} className="text-body text-ink">
+                  <p key={item.id} className="whitespace-pre-line text-body text-ink">
                     [{item.type}] {item.text}
                   </p>
                 ))}
@@ -482,7 +486,9 @@ export default function ResultPage() {
           <Card variant="coach">
             <Stack gap={1}>
               <p className="text-label font-bold text-brand-strong">핵심 질문</p>
-              <p className="text-body text-ink">{priorityQuestion.text}</p>
+              <p className="whitespace-pre-line text-body text-ink">
+                {priorityQuestion.text}
+              </p>
               {priorityQuestion.priorityReason && (
                 <p className="text-caption text-text-secondary">
                   고른 이유: {priorityQuestion.priorityReason}
@@ -496,7 +502,7 @@ export default function ResultPage() {
             <Stack gap={1}>
               <p className="text-label font-bold text-text-secondary">다른 질문</p>
               {otherQuestions.map((q) => (
-                <p key={q.id} className="text-body text-ink">
+                <p key={q.id} className="whitespace-pre-line text-body text-ink">
                   {q.text}
                 </p>
               ))}
@@ -510,7 +516,7 @@ export default function ResultPage() {
               <p className="text-label font-bold text-text-secondary">탐색</p>
               <Stack gap={1}>
                 {explorationResponses.map((r) => (
-                  <p key={r.id} className="text-body text-ink">
+                  <p key={r.id} className="whitespace-pre-line text-body text-ink">
                     {r.content}
                   </p>
                 ))}
@@ -527,7 +533,9 @@ export default function ResultPage() {
                 {userPerspectives.map((p) => (
                   <div key={p.id}>
                     <Badge variant="neutral">{PERSPECTIVE_LENS_LABELS[p.lensType]}</Badge>
-                    <p className="mt-1 text-body text-ink">{p.content}</p>
+                    <p className="whitespace-pre-line mt-1 text-body text-ink">
+                      {p.content}
+                    </p>
                   </div>
                 ))}
               </Stack>
@@ -541,7 +549,7 @@ export default function ResultPage() {
               <p className="text-label font-bold text-text-secondary">대안 프레임</p>
               <Stack gap={1}>
                 {userReframes.map((r) => (
-                  <p key={r.id} className="text-body text-ink">
+                  <p key={r.id} className="whitespace-pre-line text-body text-ink">
                     {r.text}
                   </p>
                 ))}
@@ -588,15 +596,19 @@ export default function ResultPage() {
           <p className="text-heading-3 font-bold text-ink">AI 피드백</p>
           <Card variant="coach">
             <p className="text-label font-bold text-brand-strong">이미 드러난 점</p>
-            <p className="text-body text-ink">{feedback.strength}</p>
+            <p className="whitespace-pre-line text-body text-ink">{feedback.strength}</p>
           </Card>
           <Card variant="coach">
             <p className="text-label font-bold text-brand-strong">더 살펴볼 점</p>
-            <p className="text-body text-ink">{feedback.improvementFocus}</p>
+            <p className="whitespace-pre-line text-body text-ink">
+              {feedback.improvementFocus}
+            </p>
           </Card>
           <Card variant="coach">
             <p className="text-label font-bold text-brand-strong">아직 가설인 점</p>
-            <p className="text-body text-ink">{feedback.unverifiedAssumption}</p>
+            <p className="whitespace-pre-line text-body text-ink">
+              {feedback.unverifiedAssumption}
+            </p>
           </Card>
         </Stack>
       ) : (

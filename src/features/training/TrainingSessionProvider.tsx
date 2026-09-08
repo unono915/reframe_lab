@@ -335,9 +335,19 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
 
+    /*
+      템플릿 목록은 세션과 **동시에** 받는다. 예전에는 세션을 다 만든 뒤에 받았는데,
+      목록 조회는 세션이 무엇인지 전혀 몰라도 되는 요청이다 — 필요한 것은 마지막에
+      `find`할 때뿐이다. 순서대로 기다릴 이유가 없는 왕복이 하나 줄었다.
+
+      실패해도 이름만 비우고 화면은 정상적으로 보여준다(렌즈 이름은 보조 정보다).
+    */
+    const templatesPromise = trackedFetch("/api/templates")
+      .then((res) => parseJsonSafe<{ templates: TrainingTemplate[] }>(res))
+      .catch(() => null);
+
     async function loadTemplateFor(session: TrainingSessionSnapshot["session"]) {
-      const res = await trackedFetch("/api/templates");
-      const body = await parseJsonSafe<{ templates: TrainingTemplate[] }>(res);
+      const body = await templatesPromise;
       return body?.templates.find((t) => t.id === session.templateId) ?? null;
     }
 
@@ -352,18 +362,16 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
 
         if (!snapshot) {
           const timezone = timezoneRef.current;
-          const todayRes = await trackedFetch(
-            `/api/templates/today?timezone=${encodeURIComponent(timezone)}`,
-          );
-          const todayBody = await parseJsonSafe<{ template: TrainingTemplate }>(todayRes);
-          if (!todayBody) throw new UserFacingError("오늘의 렌즈를 불러오지 못했어요.");
-
+          /*
+            오늘의 렌즈를 먼저 물어보고 그 답을 실어 보내지 않는다. 고르는 규칙은
+            (날짜, 사용자)만 있으면 정해지는 결정론적 함수라 서버도 똑같이 고를 수
+            있고, 그러면 시작 버튼을 누른 뒤 기다리는 왕복이 하나 줄어든다.
+          */
           const createRes = await trackedFetch("/api/sessions", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               clientGeneratedId: crypto.randomUUID(),
-              templateId: todayBody.template.id,
               timezone,
               clientRequestId: crypto.randomUUID(),
             }),

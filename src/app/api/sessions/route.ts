@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { todayDateString } from "@/domain/templates/selection";
+import { selectTemplateForDate, todayDateString } from "@/domain/templates/selection";
 import { apiError } from "@/lib/errors";
 import { createRouteContext, withIdempotency } from "../_lib/route-context";
 
@@ -9,7 +9,18 @@ const FOREIGN_KEY_VIOLATION = "23503";
 
 const createSessionSchema = z.object({
   clientGeneratedId: z.string().min(1),
-  templateId: z.string().min(1),
+  /*
+    비워둘 수 있다. 그러면 서버가 오늘의 렌즈를 직접 고른다.
+
+    예전에는 클라이언트가 반드시 채워야 해서, 훈련을 시작하려면 `templates/today`를
+    먼저 받아 그 답을 이 요청에 실어 보내야 했다 — 왕복 두 번이 순서대로 필요했다.
+    고르는 규칙은 (날짜, 사용자)만 있으면 정해지는 결정론적 함수라 서버도 똑같이
+    고를 수 있고, 그러면 왕복 하나가 사라진다.
+
+    명시적으로 보내는 경로도 그대로 둔다 — Revisit처럼 "이 렌즈로" 시작하는 자리가
+    있고, 오늘의 렌즈를 이미 손에 쥔 호출자가 한 번 더 고르게 할 이유도 없다.
+  */
+  templateId: z.string().min(1).optional(),
   timezone: z.string().min(1),
   clientRequestId: z.string().min(1),
 });
@@ -41,10 +52,29 @@ export async function POST(request: NextRequest) {
   const parsed = createSessionSchema.safeParse(json);
   if (!parsed.success)
     return apiError("validation_error", parsed.error.issues[0]?.message);
-  const { clientGeneratedId, templateId, timezone, clientRequestId } = parsed.data;
+  const { clientGeneratedId, timezone, clientRequestId } = parsed.data;
+
+  /** 클라이언트가 렌즈를 지정하지 않았을 때 서버가 같은 규칙으로 고른다. */
+  async function pickTodayTemplateId(): Promise<string | null> {
+    const [templates, recentTemplateIds] = await Promise.all([
+      repos.templateRepository.listActiveTemplates(),
+      repos.sessionRepository.listRecentTemplateIds(userId, 5),
+    ]);
+    const chosen = selectTemplateForDate({
+      date: todayDateString(timezone),
+      userId,
+      templates,
+      recentTemplateIds,
+    });
+    return chosen?.id ?? null;
+  }
 
   return withIdempotency(supabase, userId, clientRequestId, async () => {
     try {
+      const templateId = parsed.data.templateId ?? (await pickTodayTemplateId());
+      if (!templateId) {
+        return apiError("internal_error", "오늘의 렌즈를 준비하지 못했어요.");
+      }
       const snapshot = await repos.sessionRepository.createSession({
         userId,
         templateId,

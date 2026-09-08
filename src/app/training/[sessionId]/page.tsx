@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { PageState } from "@/components/ui";
 import {
   TrainingSessionProvider,
@@ -25,7 +25,6 @@ import {
  */
 function TrainingRouteSync() {
   const router = useRouter();
-  const params = useParams<{ sessionId: string }>();
   const searchParams = useSearchParams();
   const { status, snapshot, errorMessage, isSoloMode, enableSoloMode } =
     useTrainingSession();
@@ -55,11 +54,24 @@ function TrainingRouteSync() {
     */
     const soloQuery = wantsSolo && !isSoloMode ? "?solo=1" : "";
     const desiredPath = `/training/${snapshot.session.id}${soloQuery}`;
-    const currentPath = `/training/${params.sessionId}${searchParams.get("solo") === "1" ? "?solo=1" : ""}`;
-    if (currentPath !== desiredPath) {
-      router.replace(desiredPath);
-    }
-  }, [status, snapshot, params.sessionId, router, wantsSolo, isSoloMode, searchParams]);
+    const currentPath = `${window.location.pathname}${window.location.search}`;
+    if (currentPath === desiredPath) return;
+
+    /*
+      `router.replace`가 아니라 브라우저의 history API를 쓴다(Next.js가 지원하는
+      방식이고 `usePathname`/`useSearchParams`와도 동기화된다).
+
+      왜 바꿨나 — `/training/new`에서 `/training/<id>`로 가는 것은 Next 입장에서
+      동적 세그먼트 값이 바뀌는 **진짜 이동**이라 이 페이지가 다시 마운트된다.
+      그러면 Provider의 초기화가 처음부터 한 번 더 돌아서, 방금 만든 세션을 다시
+      조회하고(왕복 두 번) **화면은 잠깐 로딩 상태로 되돌아간다.** 시작 버튼을 누른
+      직후에 로딩이 한 번 더 깜빡이는 것이 그 때문이었다.
+
+      여기서 필요한 것은 이동이 아니라 주소 정리다 — 새로고침했을 때 같은 자리로
+      돌아오게 하는 것. 그건 이동 없이 주소만 바꾸면 된다.
+    */
+    window.history.replaceState(null, "", desiredPath);
+  }, [status, snapshot, wantsSolo, isSoloMode, router]);
 
   if (status === "loading") {
     return <PageState status="loading" loadingLabel="오늘의 훈련을 준비하고 있어요." />;

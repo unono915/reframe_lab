@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { appAlert } from "./helpers/alerts";
 import { resetActiveSession } from "./helpers/cleanup";
 import {
   completeSelfAssessment,
@@ -70,4 +71,36 @@ test("다시 생각하기(Revisit)는 새 세션을 만들고, 원본을 삭제�
   // 삭제가 FK 오류로 실패하면 이 페이지 이동 자체가 일어나지 않는다 — 회귀 지점.
   await expect(page).toHaveURL("/history");
   await expect(page.getByText("Revisit 삭제 회귀 검증용 관찰 문장")).not.toBeVisible();
+});
+
+test("진행 중인 훈련이 있으면 다시 생각하기를 막고 이유를 알려준다", async ({
+  page,
+  request,
+}) => {
+  /*
+    `createSession`은 활성 세션이 있으면 그것을 그대로 돌려준다 — "오늘의 훈련 시작"
+    에서는 맞는 동작이지만(이어서 하기), Revisit에서는 사용자가 특정 기록을 다시
+    보겠다고 눌렀는데 **무관한 진행 중 세션**에 떨어진다. 아무 설명 없이 다른 훈련이
+    열리므로 앱이 고장 난 것처럼 보인다.
+
+    사용자당 활성 세션 하나라는 제약은 그대로 두되, 그 사실을 말해주는지 확인한다.
+  */
+  const history = await request.get("/api/history");
+  const { sessions } = (await history.json()) as {
+    sessions: { id: string; status: string }[];
+  };
+  const completed = sessions.find((s) => s.status === "completed");
+  expect(completed, "완료된 기록이 하나는 있어야 한다").toBeTruthy();
+
+  // 진행 중인 훈련을 하나 만들어 둔다.
+  await page.goto("/training/new");
+  await expect(page.getByText("1 / 7 관찰")).toBeVisible();
+
+  await page.goto(`/result/${completed!.id}`);
+  await page.getByRole("button", { name: "이 장면 다시 생각하기" }).click();
+
+  // `getByRole("alert")`는 Next의 빈 route announcer에도 걸린다 — `appAlert` 참고.
+  await expect(appAlert(page)).toContainText("진행 중인 훈련이 있어요");
+  // 옮겨가지 않는다 — 엉뚱한 세션으로 떨어지는 것이 원래 문제였다.
+  await expect(page).toHaveURL(new RegExp(`/result/${completed!.id}`));
 });

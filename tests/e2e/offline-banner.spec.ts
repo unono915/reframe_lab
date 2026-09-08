@@ -29,6 +29,10 @@ test.beforeEach(async ({ request }) => {
   await resetActiveSession(request);
 });
 
+// 이 파일의 테스트는 훈련 세션을 만들고 실제 저장 왕복까지 한다. iOS Safari에서
+// 기본 30초를 넘겨 깨진 적이 있다 — 느린 이유가 있으므로 예산을 명시한다.
+test.slow();
+
 test("연결이 끊기면 알리고, 돌아오면 사라진다", async ({ page, context }) => {
   await page.goto("/training/new");
   await expect(page.getByText("1 / 7 관찰")).toBeVisible();
@@ -85,7 +89,10 @@ test("브라우저가 온라인이라고 우겨도, 요청이 실패하면 알�
   const banner = page.getByText("오프라인이에요.", { exact: false });
   await expect(banner).toBeHidden();
 
-  await page.route("**/api/**", (route) => route.abort("failed"));
+  // 저장 경로만 끊는다. `**/api/**` 전체를 끊으면 세션 조회까지 죽어서 화면이
+  // 아예 안 그려진다 — 여기서 보려는 것은 "저장이 실패했을 때"이지 "앱을 못 여는
+  // 상황"이 아니다(그건 앞의 두 테스트가 본다).
+  await page.route("**/api/sessions/*/mutate", (route) => route.abort("failed"));
   await page.getByLabel("관찰한 장면").fill("연결이 죽은 동안 쓴 문장");
   await page.getByRole("button", { name: "다음 질문으로" }).click();
 
@@ -96,7 +103,7 @@ test("브라우저가 온라인이라고 우겨도, 요청이 실패하면 알�
   await expect(page.getByLabel("관찰한 장면")).toHaveValue("연결이 죽은 동안 쓴 문장");
 
   // 다시 닿기 시작하면 배너는 사라진다 — 새로고침 없이.
-  await page.unroute("**/api/**");
+  await page.unroute("**/api/sessions/*/mutate");
   await page.getByRole("button", { name: "다음 질문으로" }).click();
   await expect(banner).toBeHidden();
 });

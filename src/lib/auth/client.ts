@@ -9,6 +9,8 @@
  * 대신 인증 화면은 마운트 시 `prefetchAuthClient()`로 미리 받아둔다 — 사용자가
  * 이메일을 입력하는 동안 내려받히므로 제출 시점에는 이미 준비돼 있다.
  */
+import { reportNetworkFailure, reportNetworkSuccess } from "@/lib/network-status";
+
 async function browserClient() {
   const mod = await import("@/lib/supabase/client");
   return mod.createSupabaseBrowserClient();
@@ -33,6 +35,42 @@ export type AuthResult = { ok: true } | { ok: false; message: string };
 
 const GENERIC_LOGIN_ERROR = "이메일 또는 비밀번호를 다시 확인해주세요.";
 const GENERIC_ERROR = "잠시 후 다시 시도해주세요.";
+const NETWORK_ERROR = "지금 서버에 닿지 못했어요. 연결을 확인한 뒤 다시 시도해주세요.";
+
+/**
+ * 서버가 대답한 실패인가, 서버에 닿지도 못한 실패인가.
+ *
+ * 둘을 뭉뚱그리면 문구가 사용자를 잘못된 곳으로 보낸다 — 지하철에서 연결이 끊긴
+ * 사람에게 "이메일 또는 비밀번호를 다시 확인해주세요"라고 말하면, 맞는 비밀번호를
+ * 몇 번이고 다시 입력하다가 자기 계정을 의심하게 된다. 앱의 다른 저장 경로는 이미
+ * 이 구분을 하고 있는데(`lib/network-status.ts`) 인증 화면만 빠져 있었다.
+ *
+ * supabase-js는 fetch 자체가 실패하면 `AuthRetryableFetchError`(상태 0)를 준다.
+ * 클래스를 import하지 않고 이름으로 보는 이유는 그 클래스가 전이 의존성
+ * (`@supabase/auth-js`)에만 있어서다 — 직접 import하면 우리가 고르지 않은 패키지의
+ * 경로에 묶인다.
+ *
+ * **계정 열거와는 무관한 구분이다.** 여기서 갈리는 것은 전송 계층의 성패뿐이고,
+ * 서버가 대답한 경우의 문구는 예전과 똑같이 하나로 유지된다.
+ */
+function isTransportFailure(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const { name, status } = error as { name?: string; status?: number };
+  return name === "AuthRetryableFetchError" || status === 0;
+}
+
+/**
+ * 인증 호출의 결과를 네트워크 상태에 반영한다. 오프라인 배너는 관측된 실패로
+ * 판단하는데(`navigator.onLine`은 캡티브 포털에서 거짓말을 한다), 인증 화면만
+ * `trackedFetch`를 거치지 않아 이 관측에서 빠져 있었다 — 로그인이 안 되는 진짜 이유가
+ * 화면 어디에도 없던 셈이다.
+ */
+function reportAuthOutcome(error: unknown): boolean {
+  const transport = isTransportFailure(error);
+  if (transport) reportNetworkFailure();
+  else reportNetworkSuccess();
+  return transport;
+}
 
 function emailRedirectTo(path: string): string {
   if (typeof window === "undefined") return path;
@@ -45,6 +83,7 @@ export async function signInWithEmail(
 ): Promise<AuthResult> {
   const supabase = await browserClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (reportAuthOutcome(error)) return { ok: false, message: NETWORK_ERROR };
   if (error) {
     // 계정 열거 공격 방지 — 자격 증명 오류든 미인증 이메일이든 같은 문구를 보인다.
     return { ok: false, message: GENERIC_LOGIN_ERROR };
@@ -62,6 +101,7 @@ export async function signUpWithEmail(
     password,
     options: { emailRedirectTo: emailRedirectTo("/auth/confirm?next=/") },
   });
+  if (reportAuthOutcome(error)) return { ok: false, message: NETWORK_ERROR };
   if (error) {
     if (error.code === "user_already_exists" || error.status === 422) {
       return { ok: false, message: "이미 가입된 이메일이에요. 로그인해주세요." };
@@ -79,22 +119,34 @@ export async function hasActiveSession(): Promise<boolean> {
   return session !== null;
 }
 
-export async function signOut(): Promise<void> {
+/**
+ * 실패를 삼키지 않는다. 예전에는 반환값이 없어서, 로그아웃 요청이 네트워크에서
+ * 죽으면 화면은 아무 말 없이 그대로 있고 사용자는 버튼이 고장 난 줄 알았다.
+ */
+export async function signOut(): Promise<AuthResult> {
   const supabase = await browserClient();
-  await supabase.auth.signOut();
+  const { error } = await supabase.auth.signOut();
+  if (reportAuthOutcome(error)) return { ok: false, message: NETWORK_ERROR };
+  if (error) return { ok: false, message: GENERIC_ERROR };
+  return { ok: true };
 }
 
-export async function requestPasswordReset(email: string): Promise<void> {
+export async function requestPasswordReset(email: string): Promise<AuthResult> {
   const supabase = await browserClient();
-  // 계정 존재 여부를 노출하지 않기 위해 결과를 분기하지 않는다 (DESIGN.md §10.9.3).
-  await supabase.auth.resetPasswordForEmail(email, {
+  // 계정 존재 여부를 노출하지 않기 위해 **서버가 대답한** 결과는 분기하지 않는다
+  // (DESIGN.md §10.9.3). 다만 요청이 서버에 닿지도 못한 경우까지 "보냈어요"라고
+  // 말하면 오지 않을 메일을 기다리게 된다 — 그건 보호가 아니라 거짓말이다.
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: emailRedirectTo("/auth/reset-password/confirm"),
   });
+  if (reportAuthOutcome(error)) return { ok: false, message: NETWORK_ERROR };
+  return { ok: true };
 }
 
 export async function updatePassword(newPassword: string): Promise<AuthResult> {
   const supabase = await browserClient();
   const { error } = await supabase.auth.updateUser({ password: newPassword });
+  if (reportAuthOutcome(error)) return { ok: false, message: NETWORK_ERROR };
   if (error) return { ok: false, message: GENERIC_ERROR };
   return { ok: true };
 }
@@ -106,6 +158,7 @@ export async function resendVerificationEmail(email: string): Promise<AuthResult
     email,
     options: { emailRedirectTo: emailRedirectTo("/auth/confirm?next=/") },
   });
+  if (reportAuthOutcome(error)) return { ok: false, message: NETWORK_ERROR };
   if (error) return { ok: false, message: GENERIC_ERROR };
   return { ok: true };
 }

@@ -2,7 +2,16 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Badge, Button, Card, cn, Field, Stack, Textarea } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  Field,
+  InlineError,
+  Stack,
+  Textarea,
+  cn,
+} from "@/components/ui";
 import { contrastiveExampleFor } from "@/domain/training/contrastive";
 import { SELF_CHECK_ITEMS, type SelfCheckKey } from "@/domain/training/requirements";
 import {
@@ -13,7 +22,6 @@ import {
   type SelfAssessmentStatus,
 } from "@/domain/training/self-assessment";
 import { CoachLoadingCard } from "../CoachLoadingCard";
-import { InlineError } from "../InlineError";
 import { StageShell } from "../StageShell";
 import { useTrainingSession } from "../TrainingSessionProvider";
 import { useMutationAction } from "../useMutationAction";

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Card, LinkButton, PageState, Stack } from "@/components/ui";
+import { Button, Card, InlineError, LinkButton, PageState, Stack } from "@/components/ui";
 import type { SessionSummary, TrainingSession, TrainingTemplate } from "@/domain/types";
 import { signOut } from "@/lib/auth/client";
 import { fetchJson } from "@/lib/fetch-json";
@@ -65,9 +65,17 @@ export default function HomePage() {
   const [revisitDays, setRevisitDays] = useState(0);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState<string | null>(null);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
 
   async function handleSignOut() {
-    await signOut();
+    setSignOutError(null);
+    const result = await signOut();
+    if (!result.ok) {
+      // 로그아웃이 실패했는데 로그인 화면으로 보내면, 세션은 살아 있는 채로
+      // 나간 것처럼 보인다. 실패했다고 말하고 이 자리에 남는다.
+      setSignOutError(result.message);
+      return;
+    }
     router.push("/auth/login");
     router.refresh();
   }
@@ -149,6 +157,7 @@ export default function HomePage() {
             로그아웃
           </Button>
         </Stack>
+        <InlineError message={signOutError} />
         <Card variant="daily">
           <Stack gap={3}>
             <p className="text-label font-bold text-brand-strong">오늘 다시 볼 장면</p>

@@ -6,6 +6,7 @@ export { Card } from "./Card";
 export type { CardProps, CardVariant } from "./Card";
 export { Field } from "./Field";
 export type { FieldProps } from "./Field";
+export { InlineError } from "./InlineError";
 export { Input, PasswordInput } from "./Input";
 export type { InputProps, PasswordInputProps } from "./Input";
 export { PageState } from "./PageState";

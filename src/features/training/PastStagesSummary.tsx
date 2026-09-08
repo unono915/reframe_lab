@@ -2,9 +2,8 @@
 
 import { useState } from "react";
 import type { Stage, TrainingSessionSnapshot } from "@/domain/types";
-import { Badge, Button, Card, Stack, Textarea } from "@/components/ui";
+import { Badge, Button, Card, InlineError, Stack, Textarea } from "@/components/ui";
 import { STAGE_ORDER, stageIndex, stageLabel } from "@/domain/training/stages";
-import { InlineError } from "./InlineError";
 import { useTrainingSession } from "./TrainingSessionProvider";
 import { useMutationAction } from "./useMutationAction";
 

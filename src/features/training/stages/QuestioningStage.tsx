@@ -2,11 +2,10 @@
 
 import { useRef, useState } from "react";
 import type { HintLevel } from "@/domain/types";
-import { Button, Card, Field, Stack, Textarea } from "@/components/ui";
+import { Button, Card, Field, InlineError, Stack, Textarea } from "@/components/ui";
 import { INPUT_LIMITS } from "@/lib/schemas/stage-input";
 import { EXCEPTION_PROMPT_KEYS } from "@/domain/training/requirements";
 import { CoachLoadingCard } from "../CoachLoadingCard";
-import { InlineError } from "../InlineError";
 import { StageShell } from "../StageShell";
 import { useTrainingSession } from "../TrainingSessionProvider";
 import { useMutationAction } from "../useMutationAction";

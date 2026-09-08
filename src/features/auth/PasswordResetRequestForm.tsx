@@ -11,9 +11,11 @@ import {
   type PasswordResetRequestInput,
 } from "@/lib/schemas/auth";
 import { AuthShell } from "./AuthShell";
+import { AuthErrorBanner } from "./AuthErrorBanner";
 
 export function PasswordResetRequestForm() {
   const [sent, setSent] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   // 인증 SDK는 동적으로 불러온다(lib/auth/client.ts). 사용자가 입력하는 동안 미리
   // 받아두면 제출 시점에는 이미 준비돼 있어, 지연 로딩의 비용이 드러나지 않는다.
@@ -29,8 +31,15 @@ export function PasswordResetRequestForm() {
   });
 
   async function onSubmit(values: PasswordResetRequestInput) {
-    // DESIGN.md §10.9.3: 성공 여부와 무관하게 동일한 안내를 보여준다(계정 존재 노출 방지).
-    await requestPasswordReset(values.email);
+    setFormError(null);
+    // DESIGN.md §10.9.3: **서버가 대답했다면** 결과와 무관하게 동일한 안내를 보여준다
+    // (계정 존재 노출 방지). 요청이 서버에 닿지도 못한 경우는 다르다 — 그때까지
+    // "보냈어요"라고 하면 오지 않을 메일을 기다리게 된다.
+    const result = await requestPasswordReset(values.email);
+    if (!result.ok) {
+      setFormError(result.message);
+      return;
+    }
     setSent(true);
   }
 
@@ -53,6 +62,7 @@ export function PasswordResetRequestForm() {
       ) : (
         <form onSubmit={handleSubmit(onSubmit)} noValidate>
           <Stack gap={5}>
+            {formError && <AuthErrorBanner message={formError} />}
             <Field id="reset-email" label="이메일" errorText={errors.email?.message}>
               <Input type="email" autoComplete="email" {...register("email")} />
             </Field>

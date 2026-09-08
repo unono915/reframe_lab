@@ -1,5 +1,6 @@
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { type NextRequest, NextResponse } from "next/server";
+import { safeNextPath } from "@/lib/auth/next-path";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 /**
@@ -11,7 +12,8 @@ export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
-  const next = searchParams.get("next") ?? "/";
+  // 확인 링크의 목적지도 같은 이유로 이 앱 안의 경로만 허용한다.
+  const next = safeNextPath(searchParams.get("next"));
 
   if (tokenHash && type) {
     const supabase = await createSupabaseServerClient();

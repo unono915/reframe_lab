@@ -97,6 +97,18 @@ test("예외로 넘어간 사실이 기록에 남는다", async ({ page, request
   // 사유가 남아야 나중에 "요건을 채웠다"와 구분된다(PRD §6.3).
   expect(reasons?.length).toBeGreaterThan(0);
   expect(reasons?.[0]?.content).toContain("떠오르지 않아요");
+
+  /*
+    기록 화면에도 보여야 한다. 그 단계의 산출물이 비어 있는 이유가 어디에도 없으면,
+    나중에 읽는 사람에게는 그냥 빠뜨린 것처럼 보인다 — 실패로 처리하지 않겠다는
+    약속의 나머지 절반은 "왜 비었는지를 남기는 것"이다.
+  */
+  const active = (await (await request.get("/api/sessions?status=active")).json()) as {
+    snapshot: { session: { id: string } } | null;
+  };
+  await page.goto(`/result/${active.snapshot?.session.id}`);
+  await expect(page.getByText("여기까지라고 적고 넘어간 단계")).toBeVisible();
+  await expect(page.getByText("지금은 떠오르지 않아요")).toBeVisible();
 });
 
 test("사유를 고쳐 다시 내면 마지막 문장이 남는다", async ({ page, request }) => {

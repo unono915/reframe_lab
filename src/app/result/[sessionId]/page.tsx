@@ -5,15 +5,24 @@ import { useParams, useRouter } from "next/navigation";
 import { Badge, Button, Card, LinkButton, PageState, Stack } from "@/components/ui";
 import type {
   AuthorType,
+  Stage,
   TrainingSessionSnapshot,
   TrainingTemplate,
 } from "@/domain/types";
-import { PERSPECTIVE_LENS_LABELS, sessionStatusLabel } from "@/domain/training/stages";
+import {
+  PERSPECTIVE_LENS_LABELS,
+  sessionStatusLabel,
+  stageLabel,
+} from "@/domain/training/stages";
+import {
+  EXCEPTION_PROMPT_KEYS,
+  isSoloModeSession,
+  PAST_STAGE_EDIT_REASON,
+} from "@/domain/training/requirements";
 import {
   compareSelfAssessmentWithAi,
   overconfidentDimensions,
 } from "@/domain/training/self-assessment";
-import { PAST_STAGE_EDIT_REASON } from "@/domain/training/requirements";
 import { fetchJson } from "@/lib/fetch-json";
 
 function detectTimezone(): string {
@@ -241,6 +250,21 @@ export default function ResultPage() {
   const userPerspectives = snapshot.perspectives.filter((p) => p.authorType === "user");
 
   /*
+    "지금은 여기까지"라고 적고 넘어간 단계의 사유. PRD §6.3이 기록하라고 정한 값인데
+    기록 화면에는 나오지 않았다. 그 단계의 산출물이 비어 있는 이유가 기록 어디에도
+    없어서, 나중에 읽으면 그냥 빠뜨린 것처럼 보인다 — 실패로 처리하지 않겠다는 약속의
+    나머지 절반은 "왜 비었는지를 남기는 것"이다.
+  */
+  const exceptionReasons = (
+    Object.entries(EXCEPTION_PROMPT_KEYS) as [Stage, string][]
+  ).flatMap(([stage, promptKey]) => {
+    const response = snapshot.stageResponses.find(
+      (r) => r.promptKey === promptKey && !r.isDraft && r.content.trim(),
+    );
+    return response ? [{ stage, content: response.content.trim() }] : [];
+  });
+
+  /*
     그때 스스로 어떻게 판단했는지도 기록의 일부다. 저장은 P0-2부터 되고 있었는데
     이 화면에만 빠져 있어서, 다시 볼 때 남는 것은 결과물뿐이었다.
 
@@ -289,6 +313,9 @@ export default function ResultPage() {
           <Badge variant={snapshot.session.status === "completed" ? "brand" : "neutral"}>
             {sessionStatusLabel(snapshot.session.status)}
           </Badge>
+          {/* 이 기록이 "코치 없이" 한 것인지도 기록의 일부다(P1-6). Growth는 세고 있는데
+              정작 기록 자체에는 표시가 없어서, 나중에 읽으면 구분되지 않았다. */}
+          {isSoloModeSession(snapshot) && <Badge variant="neutral">코치 없이</Badge>}
         </Stack>
       </Stack>
 
@@ -361,6 +388,25 @@ export default function ResultPage() {
 
       <Stack gap={3}>
         <p className="text-heading-3 font-bold text-ink">사고 과정</p>
+
+        {exceptionReasons.length > 0 && (
+          <Card variant="neutral">
+            <Stack gap={2}>
+              <p className="text-label font-bold text-text-secondary">
+                여기까지라고 적고 넘어간 단계
+              </p>
+              {exceptionReasons.map((reason) => (
+                <div key={reason.stage}>
+                  <Badge variant="neutral">{stageLabel(reason.stage)}</Badge>
+                  <p className="mt-1 text-body text-ink">{reason.content}</p>
+                </div>
+              ))}
+              <p className="text-caption text-text-tertiary">
+                채우지 못한 것이 아니라, 그때 확인할 수 있는 만큼까지 간 기록이에요.
+              </p>
+            </Stack>
+          </Card>
+        )}
 
         {snapshot.observation && (
           <Card variant="paper">

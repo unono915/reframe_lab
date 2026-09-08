@@ -82,6 +82,10 @@ test("코치 없이도 끝까지 갈 수 있고, 그 기록이 성장 화면에 
 
   await finishSession(page);
 
+  // 기록 자체에도 표시가 남아야 한다 — Growth는 세고 있는데 기록에는 흔적이 없으면,
+  // 나중에 열었을 때 이날 무엇을 다르게 했는지 구분되지 않는다.
+  await expect(page.getByText("코치 없이")).toBeVisible();
+
   await page.goto("/growth");
   await expect(page.getByText("혼자 해낸 기록")).toBeVisible();
 });

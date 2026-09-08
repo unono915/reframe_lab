@@ -33,3 +33,11 @@ test("미인증 화면 요청은 로그인으로 보내되 원래 자리를 기�
   await page.goto("/history");
   await expect(page).toHaveURL(/\/auth\/login\?next=%2Fhistory/);
 });
+
+test("돌아갈 자리에는 쿼리도 함께 남는다", async ({ page }) => {
+  // 경로만 기억하면 `?solo=1`처럼 **무엇을 하려던 것인지가 담긴 부분**이 로그인
+  // 과정에서 사라진다. 돌아온 사용자는 코치 없이 하려던 훈련을 평소대로 시작하게
+  // 되고, 그 차이는 화면에 아무 표시도 남기지 않는다.
+  await page.goto("/training/new?solo=1");
+  await expect(page).toHaveURL(/\/auth\/login\?next=%2Ftraining%2Fnew%3Fsolo%3D1/);
+});

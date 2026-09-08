@@ -106,7 +106,10 @@ export async function updateSession(request: NextRequest) {
     }
 
     const loginUrl = new URL("/auth/login", request.url);
-    loginUrl.searchParams.set("next", pathname);
+    // 쿼리까지 함께 기억한다. 경로만 남기면 `?solo=1`처럼 **무엇을 하려던 것인지가
+    // 담긴 부분**이 로그인 과정에서 사라져, 돌아온 사용자는 자기가 고른 것과 다른
+    // 화면을 보게 된다. 이 값은 돌아갈 때 `safeNextPath`가 다시 검사한다.
+    loginUrl.searchParams.set("next", `${pathname}${request.nextUrl.search}`);
     return NextResponse.redirect(loginUrl);
   }
 

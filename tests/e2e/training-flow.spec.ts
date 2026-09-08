@@ -5,6 +5,7 @@ import {
   DEFAULT_CONTENT,
   fillStagesUntilFeedback,
   finishSession,
+  SELF_CHECK_LABELS,
   settle,
 } from "./helpers/training-flow";
 
@@ -86,4 +87,12 @@ test("완주(자기 점검 경로): AI 피드백 없이 자기 점검만으로�
   // AI 피드백을 요청하지 않고 자기 점검만으로 완료 (PRD §7.12 Fallback path)
   await completeSelfAssessment(page);
   await finishSession(page);
+
+  /*
+    그때 스스로 어떻게 판단했는지도 기록의 일부다. 저장은 P0-2부터 되고 있었는데
+    기록 화면에만 빠져 있어서, 다시 볼 때 남는 것은 결과물뿐이었다 — 2주 뒤에 다시
+    여는 자리(P1-8)에서 "그때의 판단"이 없으면 무엇을 놓쳤는지 견줄 것이 없다.
+  */
+  await expect(page.getByText("그때의 자기 점검")).toBeVisible();
+  await expect(page.getByText(SELF_CHECK_LABELS[0])).toBeVisible();
 });

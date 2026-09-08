@@ -9,6 +9,10 @@ import type {
   TrainingTemplate,
 } from "@/domain/types";
 import { sessionStatusLabel } from "@/domain/training/stages";
+import {
+  compareSelfAssessmentWithAi,
+  overconfidentDimensions,
+} from "@/domain/training/self-assessment";
 import { fetchJson } from "@/lib/fetch-json";
 
 function detectTimezone(): string {
@@ -195,6 +199,17 @@ export default function ResultPage() {
   );
   const userReframes = snapshot.reframes.filter((r) => r.authorType === "user");
 
+  /*
+    그때 스스로 어떻게 판단했는지도 기록의 일부다. 저장은 P0-2부터 되고 있었는데
+    이 화면에만 빠져 있어서, 다시 볼 때 남는 것은 결과물뿐이었다.
+
+    특히 2주 뒤에 다시 여는 자리(P1-8)에서 의미가 있다 — 그때의 판단과 지금 읽는
+    문장을 나란히 놓아야 "무엇을 놓치고 있었는지"가 보인다. 훈련 중에 보던 대조를
+    기록에서도 똑같이 보여준다(같은 순수 함수를 쓴다).
+  */
+  const comparisons = compareSelfAssessmentWithAi(snapshot, feedback ?? null);
+  const overconfident = overconfidentDimensions(comparisons);
+
   return (
     <main className="pt-safe pb-safe mx-auto flex min-h-dvh max-w-[640px] flex-col gap-8 px-5 py-10">
       <Stack gap={2}>
@@ -362,6 +377,38 @@ export default function ResultPage() {
           </Card>
         )}
       </Stack>
+
+      {comparisons.length > 0 && (
+        <Stack gap={3}>
+          <p className="text-heading-3 font-bold text-ink">그때의 자기 점검</p>
+          <Card variant="paper">
+            <Stack gap={2}>
+              {comparisons.map((c) => (
+                <div key={c.key} className="flex items-start justify-between gap-3">
+                  <p className="text-body text-ink">{c.label}</p>
+                  <span className="shrink-0">
+                    <Badge variant={c.self === "shown" ? "user" : "neutral"}>
+                      {c.self === "shown" ? "드러나 있어요" : "아직이에요"}
+                    </Badge>
+                  </span>
+                </div>
+              ))}
+            </Stack>
+          </Card>
+          {overconfident.length > 0 && (
+            <Card variant="coach">
+              <p className="text-label font-bold text-brand-strong">
+                스스로는 드러났다고 보셨지만, 코치는 근거를 찾지 못한 항목이에요
+              </p>
+              <ul className="mt-2 list-disc pl-5 text-body text-ink">
+                {overconfident.map((c) => (
+                  <li key={c.key}>{c.label}</li>
+                ))}
+              </ul>
+            </Card>
+          )}
+        </Stack>
+      )}
 
       {feedback ? (
         <Stack gap={3}>

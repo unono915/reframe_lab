@@ -10,6 +10,7 @@
  * 이메일을 입력하는 동안 내려받히므로 제출 시점에는 이미 준비돼 있다.
  */
 import { reportNetworkFailure, reportNetworkSuccess } from "@/lib/network-status";
+import { clearCachedResponses } from "@/lib/persistence/clear-cached-responses";
 
 async function browserClient() {
   const mod = await import("@/lib/supabase/client");
@@ -128,6 +129,9 @@ export async function signOut(): Promise<AuthResult> {
   const { error } = await supabase.auth.signOut();
   if (reportAuthOutcome(error)) return { ok: false, message: NETWORK_ERROR };
   if (error) return { ok: false, message: GENERIC_ERROR };
+  // 세션만 지우면 Service Worker가 들고 있는 응답 캐시에 그 사람이 쓴 글이 그대로
+  // 남는다(자세한 이유는 아래 함수 주석). 로그아웃이 성공한 뒤에만 지운다.
+  await clearCachedResponses();
   return { ok: true };
 }
 

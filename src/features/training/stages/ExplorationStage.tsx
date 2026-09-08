@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { Field, Stack, Textarea } from "@/components/ui";
+import { HintPanel } from "../HintPanel";
 import { StageShell } from "../StageShell";
 import { useTrainingSession } from "../TrainingSessionProvider";
+import { useStageHint } from "../useStageHint";
 
 const PROMPTS: {
   key: "affected_user" | "context" | "impact" | "unknown";
@@ -21,6 +23,19 @@ const PROMPTS: {
 export function ExplorationStage() {
   const { loadDraft, saveDraft, addExplorationResponse, advance } = useTrainingSession();
   const [values, setValues] = useState<Record<string, string>>({});
+  /*
+    탐색도 "다음"을 누를 때 네 답을 한꺼번에 저장한다. 부르기 직전에 **지금까지 쓴
+    답만** 확정하고 묻는다 — 빈 칸까지 저장하면 안 쓴 것을 썼다고 기록하게 된다.
+  */
+  const hint = useStageHint("exploration", {
+    hasUnsavedInput: PROMPTS.some((p) => values[p.key]?.trim()),
+    ensureSaved: async () => {
+      for (const prompt of PROMPTS) {
+        const value = values[prompt.key]?.trim();
+        if (value) await addExplorationResponse(prompt.key, value);
+      }
+    },
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -69,6 +84,9 @@ export function ExplorationStage() {
             />
           </Field>
         ))}
+
+        {/* 빠진 요소 하나를 묻는 자리(DEVELOPMENT_PLAN §8.2). 먼저 쓴 뒤에만 열린다. */}
+        <HintPanel hint={hint} label="막히면 질문 하나 받기" />
       </Stack>
     </StageShell>
   );

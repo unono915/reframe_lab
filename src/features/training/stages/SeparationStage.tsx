@@ -5,8 +5,10 @@ import type { ItemType } from "@/domain/types";
 import { Button, Card, Field, InlineError, Stack, Textarea } from "@/components/ui";
 import { INPUT_LIMITS } from "@/lib/schemas/stage-input";
 import { EXCEPTION_PROMPT_KEYS } from "@/domain/training/requirements";
+import { HintPanel } from "../HintPanel";
 import { StageShell } from "../StageShell";
 import { useTrainingSession } from "../TrainingSessionProvider";
+import { useStageHint } from "../useStageHint";
 import { useMutationAction } from "../useMutationAction";
 
 const ITEM_TYPE_LABELS: Record<ItemType, string> = {
@@ -26,6 +28,7 @@ export function SeparationStage() {
     awaitLatestSnapshot,
     advance,
   } = useTrainingSession();
+  const hint = useStageHint("separation");
   const [text, setText] = useState("");
   const [type, setType] = useState<ItemType>("fact");
   const [exceptionReason, setExceptionReason] = useState("");
@@ -148,6 +151,12 @@ export function SeparationStage() {
           {addAction.pending ? "추가하는 중이에요…" : "항목 추가하기"}
         </Button>
         <InlineError message={addAction.error} />
+
+        {/*
+          분류 후보를 제안하되 단정하지 않는다(DEVELOPMENT_PLAN §8.2). 사용자가 항목을
+          하나라도 쓴 뒤에만 열린다 — 빈 화면에 대고 AI를 부르지 않는다(원칙 1).
+        */}
+        <HintPanel hint={hint} label="분류가 헷갈리면 질문 하나 받기" />
 
         {confirmedCount === 0 && (
           <Field

@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 import { Button, Card, Field, Stack, Textarea } from "@/components/ui";
 import { INPUT_LIMITS } from "@/lib/schemas/stage-input";
 import { EXCEPTION_PROMPT_KEYS } from "@/domain/training/requirements";
+import { HintPanel } from "../HintPanel";
 import { StageShell } from "../StageShell";
 import { useTrainingSession } from "../TrainingSessionProvider";
+import { useStageHint } from "../useStageHint";
 
 export function ObservationStage() {
   const {
@@ -17,6 +19,19 @@ export function ObservationStage() {
     submitExceptionReason,
   } = useTrainingSession();
   const [rawText, setRawText] = useState("");
+  /*
+    관찰은 "다음"을 누를 때 저장된다. 그래서 서버 스냅샷만 보면 이 단계 내내 비어 있고
+    버튼이 열리지 않는다 — 부르기 직전에 지금 쓴 문장을 확정하고 묻는다.
+  */
+  const hint = useStageHint("observation", {
+    hasUnsavedInput: rawText.trim().length > 0,
+    ensureSaved: () =>
+      submitObservation({
+        rawText,
+        contextWhen: undefined,
+        contextWhere: undefined,
+      }),
+  });
   const [showException, setShowException] = useState(false);
   const [exceptionReason, setExceptionReason] = useState("");
 
@@ -93,6 +108,12 @@ export function ObservationStage() {
             />
           </Field>
         )}
+
+        {/*
+          코치는 사용자가 무언가 쓴 뒤에만 부를 수 있다(원칙 1) — 버튼이 열리는 조건도
+          서버가 쓰는 것과 같은 함수로 판정한다(`useStageHint`).
+        */}
+        {!showException && <HintPanel hint={hint} label="막히면 질문 하나 받기" />}
 
         <Button
           type="button"

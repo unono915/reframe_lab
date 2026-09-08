@@ -1,13 +1,13 @@
 "use client";
 
 import { useRef, useState } from "react";
-import type { HintLevel } from "@/domain/types";
 import { Button, Card, Field, InlineError, Stack, Textarea } from "@/components/ui";
 import { INPUT_LIMITS } from "@/lib/schemas/stage-input";
 import { EXCEPTION_PROMPT_KEYS } from "@/domain/training/requirements";
 import { CoachLoadingCard } from "../CoachLoadingCard";
 import { StageShell } from "../StageShell";
 import { useTrainingSession } from "../TrainingSessionProvider";
+import { useStageHint } from "../useStageHint";
 import { useMutationAction } from "../useMutationAction";
 
 export function QuestioningStage() {
@@ -15,33 +15,17 @@ export function QuestioningStage() {
     snapshot,
     addQuestion,
     markPriorityQuestion,
-    requestHint,
-    isSoloMode,
     submitExceptionReason,
     awaitLatestSnapshot,
     advance,
   } = useTrainingSession();
   const [text, setText] = useState("");
   /*
-    지금까지 **받은** 힌트 개수. 이것 하나에서 두 값을 파생시킨다.
-
-    예전에는 상태 하나(`hintLevel`)가 "다음에 요청할 단계"와 "지금까지 쓴 단계"를
-    겸했다. 첫 힌트(Level 0)를 받고 나면 값이 1이 되므로, 그 뒤에 쓴 질문에는
-    **실제로 쓴 적 없는 Level 1**이 기록됐다. PRD §7.6은 "힌트 수준과 사용 여부를
-    저장해 성장 지표에서 사용자 작성 결과와 구분한다"고 정하는데, 그 기록이 한 칸씩
-    부풀어 있었던 것이다.
-
-    같은 값이 예외 경로(질문 3개 미달 허용)의 문을 여는 조건이기도 해서
-    (`requirements.ts checkQuestioning`), 가장 강한 힌트를 보기 전에 문이 열렸다.
+    힌트 상태는 `useStageHint`가 전부 들고 있다 — 단계 계산, User-first gate, 대기·오류
+    표시가 화면마다 갈라지지 않게 하기 위해서다(그 훅 주석에 왜 그런지 적어두었다).
+    이 화면만 버튼 자리가 달라서(입력 옆) 패널 대신 훅만 쓴다.
   */
-  const [hintsReceived, setHintsReceived] = useState(0);
-  /** 다음에 요청할 단계 — 0 → 1 → 2에서 멈춘다. */
-  const nextHintLevel = Math.min(hintsReceived, 2) as HintLevel;
-  /** 지금까지 실제로 본 가장 강한 단계. 아직 안 받았으면 0으로 취급한다. */
-  const usedHintLevel = Math.max(hintsReceived - 1, 0) as HintLevel;
-  const [hintText, setHintText] = useState<string | null>(null);
-  const [hintPending, setHintPending] = useState(false);
-  const [hintError, setHintError] = useState<string | null>(null);
+  const hint = useStageHint("questioning");
   const [prioritySelectionId, setPrioritySelectionId] = useState<string | null>(null);
   const [priorityReason, setPriorityReason] = useState("");
   const [exceptionReason, setExceptionReason] = useState("");
@@ -59,9 +43,9 @@ export function QuestioningStage() {
     // 질문 3개를 빠르게 추가하면 그중 하나가 조용히 사라졌다).
     const submitted = text;
     // 힌트를 한 번도 안 받았으면 0이다. 받았다면 **본 것 중 가장 강한** 단계다.
-    const submittedHintLevel = hintsReceived === 0 ? (0 as HintLevel) : usedHintLevel;
+    const submittedHintLevel = hint.usedHintLevel;
     setText("");
-    setHintText(null);
+    hint.clear();
     // 다음 항목을 바로 이어 쓸 수 있게 입력창으로 focus를 돌린다. **await 앞에서**
     // 부르는 것이 중요하다 — iOS는 사용자 제스처가 살아 있는 동안에만 키보드를
     // 열어주므로, 저장을 기다린 뒤에 부르면 focus만 가고 키보드는 닫힌 채로 남는다.
@@ -74,20 +58,6 @@ export function QuestioningStage() {
       () => addQuestion({ text: submitted }, submittedHintLevel),
       () => setText(submitted),
     );
-  }
-
-  async function handleHint() {
-    setHintPending(true);
-    setHintError(null);
-    const result = await requestHint(nextHintLevel);
-    setHintPending(false);
-    if (!result.ok) {
-      setHintError(result.message);
-      return;
-    }
-    setHintText(result.question);
-    // 실패한 요청은 세지 않는다 — 보지 못한 힌트를 "썼다"고 기록하면 안 된다.
-    setHintsReceived((count) => count + 1);
   }
 
   async function handleConfirmPriority(questionId: string) {
@@ -113,7 +83,11 @@ export function QuestioningStage() {
       latest?.questions.filter((q) => q.authorType === "user") ?? questions;
     const latestHasPriority = latestQuestions.some((q) => q.isPriority);
     if (latestQuestions.length < 3 || !latestHasPriority) {
-      if (latestQuestions.length >= 1 && usedHintLevel >= 2 && exceptionReason.trim()) {
+      if (
+        latestQuestions.length >= 1 &&
+        hint.usedHintLevel >= 2 &&
+        exceptionReason.trim()
+      ) {
         await submitExceptionReason(EXCEPTION_PROMPT_KEYS.questioning, exceptionReason);
       } else {
         return {
@@ -191,14 +165,14 @@ export function QuestioningStage() {
         </Field>
         <Stack direction="row" gap={2}>
           {/* 혼자 하기로 한 세션에서는 AI 도움을 아예 노출하지 않는다 (P1-6). */}
-          {!isSoloMode && (
+          {hint.canRequest && (
             <Button
               type="button"
               variant="tertiary"
-              onClick={handleHint}
-              disabled={hintPending}
+              onClick={() => void hint.request()}
+              disabled={hint.pending}
             >
-              {hintPending ? "힌트 요청 중" : hintError ? "다시 시도" : "힌트 보기"}
+              {hint.pending ? "힌트 요청 중" : hint.error ? "다시 시도" : "힌트 보기"}
             </Button>
           )}
           <Button
@@ -211,23 +185,23 @@ export function QuestioningStage() {
           </Button>
         </Stack>
         <InlineError message={addAction.error} />
-        {hintError && (
+        {hint.error && (
           // 안심 문장은 실패 사유와 별개로 **항상** 붙인다(DESIGN.md §11 AI Error).
           // 메시지 문자열에 섞어 넣으면 서버가 더 구체적인 사유를 줄 때 사라진다 —
           // 정작 그때가 사용자가 가장 불안한 순간이다. FeedbackStage와 같은 방식이다.
           <p role="alert" className="text-caption font-bold text-danger">
-            {hintError} 작성한 내용은 그대로 있어요.
+            {hint.error} 작성한 내용은 그대로 있어요.
           </p>
         )}
         {/* 최대 20초를 기다리는 자리다. 버튼 글자만 바뀌면 눌린 건지 멈춘 건지 알 수 없다. */}
-        {hintPending && <CoachLoadingCard label="다음 질문을 정리하고 있어요." />}
-        {hintText && !hintPending && (
+        {hint.pending && <CoachLoadingCard label="다음 질문을 정리하고 있어요." />}
+        {hint.question && !hint.pending && (
           <Card variant="coach">
-            <p className="text-body-lg text-ink">{hintText}</p>
+            <p className="text-body-lg text-ink">{hint.question}</p>
           </Card>
         )}
 
-        {questions.length >= 1 && usedHintLevel >= 2 && (
+        {questions.length >= 1 && hint.usedHintLevel >= 2 && (
           <Field
             id="questioning-exception"
             label="질문이 더 떠오르지 않는다면, 이유를 적어주세요"

@@ -5,8 +5,10 @@ import type { PerspectiveLens } from "@/domain/types";
 import { Button, Card, Field, InlineError, Stack, Textarea } from "@/components/ui";
 import { INPUT_LIMITS } from "@/lib/schemas/stage-input";
 import { EXCEPTION_PROMPT_KEYS } from "@/domain/training/requirements";
+import { HintPanel } from "../HintPanel";
 import { StageShell } from "../StageShell";
 import { useTrainingSession } from "../TrainingSessionProvider";
+import { useStageHint } from "../useStageHint";
 import { PERSPECTIVE_LENS_LABELS } from "@/domain/training/stages";
 import { useMutationAction } from "../useMutationAction";
 
@@ -19,6 +21,7 @@ export function ReframingStage() {
     awaitLatestSnapshot,
     advance,
   } = useTrainingSession();
+  const hint = useStageHint("reframing");
   const [perspectiveLens, setPerspectiveLens] = useState<PerspectiveLens>("stakeholder");
   const [perspectiveText, setPerspectiveText] = useState("");
   const [reframeText, setReframeText] = useState("");
@@ -158,6 +161,13 @@ export function ReframingStage() {
             {reframeAction.pending ? "추가하는 중이에요…" : "프레임 추가하기"}
           </Button>
           <InlineError message={reframeAction.error} />
+
+          {/*
+            "사용자가 2개 작성 후에만 추가 렌즈 힌트"(DEVELOPMENT_PLAN §8.2). 여는 조건은
+            서버가 쓰는 것과 같은 함수로 판정하므로, 화면이 열어준 버튼이 거절당하는 일은
+            없다 — 예외 경로에서 그 어긋남을 실제로 겪었다.
+          */}
+          <HintPanel hint={hint} label="다른 렌즈가 떠오르지 않으면 질문 받기" />
         </Stack>
 
         {reframes.length === 1 && (

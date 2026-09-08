@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { selectTemplateForDate, todayDateString } from "@/domain/templates/selection";
 import { daysSince, suggestRevisitCandidate } from "@/domain/growth/revisit";
 import type { SessionSummary } from "@/domain/types";
+import { isSoloModeSession } from "@/domain/training/requirements";
 import { createRouteContext } from "../_lib/route-context";
 
 /**
@@ -69,6 +70,12 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     activeSession,
+    /*
+      이어서 할 세션이 "코치 없이"로 시작한 것인지 알려준다. 사용자가 일부러 고른
+      모드인데 홈에서는 흔적이 없어서, 이어서 눌렀을 때 힌트가 사라진 이유를 알
+      방법이 없었다(P1-6). 판정은 스냅샷의 표식을 보는 같은 순수 함수다.
+    */
+    activeSessionIsSolo: activeSnapshot ? isSoloModeSession(activeSnapshot) : false,
     template,
     recentRecord,
     revisitCandidate: candidate

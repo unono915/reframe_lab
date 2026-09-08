@@ -17,6 +17,7 @@ function detectTimezone(): string {
 
 interface HomePayload {
   activeSession: TrainingSession | null;
+  activeSessionIsSolo: boolean;
   template: TrainingTemplate | null;
   recentRecord: SessionSummary | null;
   revisitCandidate: { session: SessionSummary; days: number } | null;
@@ -49,6 +50,7 @@ export default function HomePage() {
   const router = useRouter();
   const [template, setTemplate] = useState<TrainingTemplate | null>(null);
   const [activeSession, setActiveSession] = useState<TrainingSession | null>(null);
+  const [activeSessionIsSolo, setActiveSessionIsSolo] = useState(false);
   const [recentRecord, setRecentRecord] = useState<SessionSummary | null>(null);
   const [revisitCandidate, setRevisitCandidate] = useState<SessionSummary | null>(null);
   const [revisitDays, setRevisitDays] = useState(0);
@@ -76,6 +78,7 @@ export default function HomePage() {
       return;
     }
     setActiveSession(result.activeSession);
+    setActiveSessionIsSolo(result.activeSessionIsSolo);
     setTemplate(result.template);
     setRecentRecord(result.recentRecord);
     setRevisitCandidate(result.revisitCandidate?.session ?? null);
@@ -148,6 +151,16 @@ export default function HomePage() {
         <LinkButton href={trainingHref} variant="primary" fullWidth>
           {isResuming ? "이어서 하기" : "오늘의 훈련 시작"}
         </LinkButton>
+        {/*
+          이어서 할 세션이 "코치 없이"로 시작한 것이면 여기서도 말해준다. 일부러 고른
+          모드인데 홈에는 흔적이 없어서, 이어서 눌렀을 때 힌트가 왜 사라졌는지 알
+          방법이 없었다 — 훈련 화면 안에서만 배지로 알려주고 있었다.
+        */}
+        {isResuming && activeSessionIsSolo && (
+          <p className="text-caption text-text-secondary">
+            코치 없이 진행 중인 훈련이에요.
+          </p>
+        )}
 
         {/*
           P1-6 전이 프로브. 이어서 하는 세션에는 띄우지 않는다 — 이미 AI를 썼을 수

@@ -57,6 +57,15 @@ test("코치 없이 시작하면 AI 도움이 사라지고, 새로고침해도 �
   // 메모리가 아니라 DB에 있다는 뜻이다.
   await expect(page.getByText(SOLO_BADGE)).toBeVisible();
   await expect(page.getByRole("button", { name: "힌트 보기" })).toHaveCount(0);
+
+  /*
+    홈에서도 그 사실이 보여야 한다. 일부러 고른 모드인데 홈에는 흔적이 없으면,
+    나중에 "이어서 하기"를 눌렀을 때 힌트가 왜 사라졌는지 알 방법이 없다 —
+    훈련 화면 안에서만 알려주고 있었다.
+  */
+  await page.goto("/");
+  await expect(page.getByRole("link", { name: "이어서 하기" })).toBeVisible();
+  await expect(page.getByText("코치 없이 진행 중인 훈련이에요.")).toBeVisible();
 });
 
 test("코치 없이도 끝까지 갈 수 있고, 그 기록이 성장 화면에 남는다", async ({ page }) => {

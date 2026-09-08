@@ -76,12 +76,15 @@ export default function ResultPage() {
   /** 두 동작의 실패 안내를 함께 쓴다 — 한 번에 하나만 진행되므로 섞일 일이 없다. */
   const [actionError, setActionError] = useState<string | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
+  /** 없는 기록은 다시 시도해도 같은 답이다 — 재시도 대신 나갈 길을 준다. */
+  const [pageErrorIsFinal, setPageErrorIsFinal] = useState(false);
 
   const apply = useCallback((result: Awaited<ReturnType<typeof loadResult>>) => {
     if (!result.session.ok) {
       // 404("요청한 세션을 찾을 수 없어요")와 서버 오류·네트워크 단절을 구분해서
       // 보여준다 — 예전에는 셋 다 "기록을 찾을 수 없어요"로 뭉뚱그렸다.
       setPageError(result.session.message);
+      setPageErrorIsFinal(result.session.errorCode === "not_found");
       setLoading(false);
       return;
     }
@@ -120,6 +123,7 @@ export default function ResultPage() {
 
   function handleRetry() {
     setPageError(null);
+    setPageErrorIsFinal(false);
     setLoading(true);
     void loadResult(params.sessionId).then(apply);
   }
@@ -168,14 +172,43 @@ export default function ResultPage() {
   }
 
   if (pageError) {
-    return <PageState status="error" message={pageError} onRetry={handleRetry} />;
+    /*
+      지운 기록의 주소를 다시 열거나 링크가 오래된 경우가 404로 온다. 그건 다시
+      시도해도 같은 답이라 재시도 버튼만 주면 사용자는 막힌 화면에 남는다 —
+      나갈 길을 준다. 서버 오류·네트워크 단절은 반대로 재시도가 맞다.
+    */
+    return pageErrorIsFinal ? (
+      <PageState
+        status="error"
+        message={pageError}
+        secondaryAction={{
+          label: "기록 목록으로",
+          onClick: () => router.push("/history"),
+        }}
+      />
+    ) : (
+      <PageState status="error" message={pageError} onRetry={handleRetry} />
+    );
   }
   if (loading) {
     return <PageState status="loading" loadingLabel="기록을 불러오고 있어요." />;
   }
   if (!snapshot) {
-    // 서버가 200으로 `snapshot: null`을 준 경우 — 정말 없는 기록이다.
-    return <PageState status="error" message="기록을 찾을 수 없어요." />;
+    /*
+      서버가 200으로 `snapshot: null`을 준 경우 — 정말 없는 기록이다. 다시 시도해도
+      같은 답이므로 재시도 대신 **나갈 길**을 준다. 지운 기록의 주소를 다시 열거나
+      링크가 오래된 경우가 여기로 오는데, 예전에는 문구만 있고 갈 곳이 없었다.
+    */
+    return (
+      <PageState
+        status="error"
+        message="기록을 찾을 수 없어요. 이미 지웠거나 주소가 오래된 것 같아요."
+        secondaryAction={{
+          label: "기록 목록으로",
+          onClick: () => router.push("/history"),
+        }}
+      />
+    );
   }
 
   const versions = [...snapshot.problemDefinitionVersions].sort(

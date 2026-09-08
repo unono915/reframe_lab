@@ -39,7 +39,15 @@ export function toDisplayMessage(error: unknown): string {
   return error instanceof UserFacingError ? error.message : toUserMessage(error);
 }
 
-export type FetchResult<T> = { ok: true; data: T } | { ok: false; message: string };
+export type FetchResult<T> =
+  | { ok: true; data: T }
+  /**
+   * `errorCode`는 서버가 준 분류다(`lib/errors.ts`). 문구는 그대로 보여주면 되지만,
+   * **다시 시도해서 달라지는 실패인지**는 호출부가 알아야 할 때가 있다 — 없는 기록에
+   * "다시 시도"만 주면 몇 번을 눌러도 같은 화면에 남는다. 네트워크 단절처럼 서버가
+   * 대답하지 못한 경우에는 없다.
+   */
+  | { ok: false; message: string; errorCode?: string };
 
 interface ApiErrorBody {
   errorCode?: string;
@@ -114,10 +122,14 @@ export async function fetchJson<T>(
   }
 
   if (!response.ok) {
-    const message = (body as ApiErrorBody | null)?.message;
+    const errorBody = body as ApiErrorBody | null;
     // 세션이 풀린 경우는 재시도로 풀리지 않는다 — 로그인 화면으로 보낸다.
     handleUnauthorized(response.status, body);
-    return { ok: false, message: message ?? UNKNOWN_ERROR_MESSAGE };
+    return {
+      ok: false,
+      message: errorBody?.message ?? UNKNOWN_ERROR_MESSAGE,
+      errorCode: errorBody?.errorCode,
+    };
   }
   if (body === null) return { ok: false, message: UNKNOWN_ERROR_MESSAGE };
 

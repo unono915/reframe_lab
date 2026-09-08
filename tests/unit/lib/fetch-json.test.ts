@@ -65,7 +65,13 @@ describe("fetchJson — 실패해도 절대 throw하지 않는다", () => {
         ),
     );
     const result = await fetchJson("/api/sessions/x/coach");
-    expect(result).toEqual({ ok: false, message: "먼저 작성해주세요." });
+    // `errorCode`도 함께 전한다 — 호출부가 "다시 시도해서 달라지는 실패인지"를
+    // 알아야 할 때가 있다(없는 기록에 재시도 버튼만 주면 계속 같은 화면에 남는다).
+    expect(result).toEqual({
+      ok: false,
+      message: "먼저 작성해주세요.",
+      errorCode: "requirement_not_met",
+    });
   });
 
   it("2xx인데 본문이 JSON이 아니면 실패로 처리한다", async () => {
@@ -178,7 +184,11 @@ describe("fetchJson — 세션 만료", () => {
     );
 
     const result = await fetchJson("/api/history");
-    expect(result).toEqual({ ok: false, message: "로그인이 풀렸어요." });
+    expect(result).toEqual({
+      ok: false,
+      message: "로그인이 풀렸어요.",
+      errorCode: "unauthorized",
+    });
     // 메시지만 보여주고 끝내면 사용자는 재시도 버튼 앞에 갇힌다.
     expect(assign).toHaveBeenCalledOnce();
   });

@@ -45,3 +45,18 @@ test("마치지 않은 기록은 끝났다고 말하지 않고, 이어서 할 �
   // 떠난 자리에서 그대로 이어진다.
   await expect(page.getByText("3 / 7 질문")).toBeVisible();
 });
+
+test("없는 기록을 열면 막히지 않고 목록으로 돌아갈 수 있다", async ({ page }) => {
+  /*
+    지운 기록의 주소를 다시 열거나 링크가 오래된 경우가 여기로 온다. 다시 시도해도
+    같은 답이라 재시도 버튼은 의미가 없는데, 예전에는 문구만 있고 갈 곳이 없었다.
+  */
+  await page.goto("/result/00000000-0000-0000-0000-000000000000");
+
+  await expect(page.getByText("찾을 수 없어요", { exact: false })).toBeVisible();
+  // 다시 시도해도 같은 답이라 그 버튼은 없어야 한다.
+  await expect(page.getByRole("button", { name: "다시 시도" })).toHaveCount(0);
+  await page.getByRole("button", { name: "기록 목록으로" }).click();
+
+  await expect(page).toHaveURL(/\/history$/);
+});

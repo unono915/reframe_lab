@@ -80,7 +80,10 @@ export async function POST(request: NextRequest) {
     try {
       const templateId = parsed.data.templateId ?? (await pickTodayTemplateId());
       if (!templateId) {
-        return apiError("internal_error", "오늘의 렌즈를 준비하지 못했어요.");
+        return apiError(
+          "internal_error",
+          "오늘의 렌즈를 준비하지 못했어요. 잠시 후 다시 시도해주세요.",
+        );
       }
       const snapshot = await repos.sessionRepository.createSession({
         userId,

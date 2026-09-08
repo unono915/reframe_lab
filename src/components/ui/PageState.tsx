@@ -14,11 +14,17 @@ export function PageState({
   status,
   message,
   onRetry,
+  secondaryAction,
   loadingLabel = "불러오고 있어요.",
 }: {
   status: "loading" | "error";
   message?: string;
   onRetry?: () => void;
+  /**
+   * 다시 시도해도 달라지지 않는 실패를 위한 출구. 예를 들어 "이 기록은 없다"는
+   * 몇 번을 눌러도 같은 답이라, 재시도 버튼만 두면 사용자는 막힌 화면에 남는다.
+   */
+  secondaryAction?: { label: string; onClick: () => void };
   loadingLabel?: string;
 }) {
   return (
@@ -35,6 +41,11 @@ export function PageState({
           {onRetry && (
             <Button type="button" variant="primary" onClick={onRetry}>
               다시 시도
+            </Button>
+          )}
+          {secondaryAction && (
+            <Button type="button" variant="tertiary" onClick={secondaryAction.onClick}>
+              {secondaryAction.label}
             </Button>
           )}
         </Stack>

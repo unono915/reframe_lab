@@ -1,5 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { selectTemplateForDate, todayDateString } from "@/domain/templates/selection";
+import {
+  RECENT_TEMPLATE_WINDOW,
+  selectTemplateForDate,
+  todayDateString,
+} from "@/domain/templates/selection";
 import { daysSince, suggestRevisitCandidate } from "@/domain/growth/revisit";
 import type { SessionSummary } from "@/domain/types";
 import { isSoloModeSession } from "@/domain/training/requirements";
@@ -49,7 +53,7 @@ export async function GET(request: NextRequest) {
   const [activeSnapshot, templates, recentTemplateIds, summaries] = await Promise.all([
     repos.sessionRepository.getActiveSessionForUser(userId),
     repos.templateRepository.listActiveTemplates(),
-    repos.sessionRepository.listRecentTemplateIds(userId, 5),
+    repos.sessionRepository.listRecentTemplateIds(userId, RECENT_TEMPLATE_WINDOW),
     repos.sessionRepository
       .listSessionSummariesForUser(userId, { limit: 100 })
       .catch((error: unknown) => {

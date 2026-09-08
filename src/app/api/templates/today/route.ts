@@ -1,5 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { selectTemplateForDate, todayDateString } from "@/domain/templates/selection";
+import {
+  RECENT_TEMPLATE_WINDOW,
+  selectTemplateForDate,
+  todayDateString,
+} from "@/domain/templates/selection";
 import { createRouteContext } from "../../_lib/route-context";
 
 /** GET /api/templates/today?timezone=Asia/Seoul — DESIGN.md §9.1, §9.2. */
@@ -11,7 +15,7 @@ export async function GET(request: NextRequest) {
   const timezone = request.nextUrl.searchParams.get("timezone") ?? "UTC";
   const [templates, recentTemplateIds] = await Promise.all([
     repos.templateRepository.listActiveTemplates(),
-    repos.sessionRepository.listRecentTemplateIds(userId, 5),
+    repos.sessionRepository.listRecentTemplateIds(userId, RECENT_TEMPLATE_WINDOW),
   ]);
 
   const chosen = selectTemplateForDate({

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import {
+  RECENT_TEMPLATE_WINDOW,
   resolveTimeZone,
   selectTemplateForDate,
   todayDateString,
@@ -65,7 +66,7 @@ export async function POST(request: NextRequest) {
   async function pickTodayTemplateId(): Promise<string | null> {
     const [templates, recentTemplateIds] = await Promise.all([
       repos.templateRepository.listActiveTemplates(),
-      repos.sessionRepository.listRecentTemplateIds(userId, 5),
+      repos.sessionRepository.listRecentTemplateIds(userId, RECENT_TEMPLATE_WINDOW),
     ]);
     const chosen = selectTemplateForDate({
       date: todayDateString(timezone),

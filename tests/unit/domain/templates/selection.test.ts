@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  RECENT_TEMPLATE_WINDOW,
   resolveTimeZone,
   selectTemplateForDate,
   todayDateString,
@@ -234,5 +235,61 @@ describe("시간대 값이 이상해도 앱은 계속 쓸 수 있어야 한다",
     expect(resolveTimeZone("")).toBe("UTC");
     expect(resolveTimeZone(null)).toBe("UTC");
     expect(resolveTimeZone(undefined)).toBe("UTC");
+  });
+});
+
+/**
+ * 오늘의 렌즈가 **얼마나 자주 되돌아오는지**를 잠근다.
+ *
+ * 단위 테스트가 하루치만 보면 이 성질은 보이지 않는다. 90일을 돌려보고서야 같은
+ * 문장이 6일 만에 돌아오고 24개 중 두 개는 한 번도 나오지 않는 것을 알았다 — 사용자가
+ * 겪는 것은 렌즈 유형이 아니라 그 문장이라, "어제 본 걸 또 보네"가 되는 자리다.
+ * (PRD §6.6: "같은 렌즈가 지나치게 반복되지 않도록 최근 노출 이력을 고려한다".)
+ */
+describe("selectTemplateForDate — 90일 회전", () => {
+  function simulate(userId: string, days = 90) {
+    const recent: string[] = [];
+    const picked: string[] = [];
+    for (let day = 0; day < days; day += 1) {
+      const date = new Date(Date.UTC(2026, 0, 1 + day)).toISOString().slice(0, 10);
+      const chosen = selectTemplateForDate({
+        date,
+        userId,
+        templates: DAILY_TEMPLATES,
+        recentTemplateIds: recent,
+      });
+      picked.push(chosen.id);
+      recent.unshift(chosen.id);
+      if (recent.length > RECENT_TEMPLATE_WINDOW) recent.pop();
+    }
+    return picked;
+  }
+
+  function minimumGap(picked: string[]): number {
+    const lastSeen = new Map<string, number>();
+    let min = Number.POSITIVE_INFINITY;
+    picked.forEach((id, index) => {
+      const previous = lastSeen.get(id);
+      if (previous !== undefined) min = Math.min(min, index - previous);
+      lastSeen.set(id, index);
+    });
+    return Number.isFinite(min) ? min : picked.length;
+  }
+
+  const USERS = ["user-a", "user-b", "user-c"];
+
+  it("같은 문장이 최근 창 안에서는 다시 나오지 않는다", () => {
+    for (const userId of USERS) {
+      expect(minimumGap(simulate(userId)), userId).toBeGreaterThan(
+        RECENT_TEMPLATE_WINDOW,
+      );
+    }
+  });
+
+  it("90일이면 24개를 모두 만난다", () => {
+    // 검수까지 거친 문구가 영영 안 나오는 일은 없어야 한다(§14-F).
+    for (const userId of USERS) {
+      expect(new Set(simulate(userId)).size, userId).toBe(DAILY_TEMPLATES.length);
+    }
   });
 });

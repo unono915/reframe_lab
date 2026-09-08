@@ -15,40 +15,29 @@ function detectTimezone(): string {
   }
 }
 
-type HomeData =
-  | { ok: true; activeSession: TrainingSession | null; template: TrainingTemplate | null }
-  | { ok: false; message: string };
+interface HomePayload {
+  activeSession: TrainingSession | null;
+  template: TrainingTemplate | null;
+  recentRecord: SessionSummary | null;
+  revisitCandidate: { session: SessionSummary; days: number } | null;
+}
+
+type HomeData = ({ ok: true } & HomePayload) | { ok: false; message: string };
 
 /**
  * setState를 하지 않는 순수 로더 — 화면 상태 적용은 호출자가 한다.
  *
- * 오늘의 렌즈와 "이어서 하기" 여부는 Home이 존재하기 위한 필수 정보라 실패하면
- * 오류를 돌려준다. 반면 템플릿 목록 조회는 진행 중 세션의 렌즈 이름을 붙이기 위한
- * 보조 조회라, 실패해도 이름만 비우고 화면은 정상적으로 보여준다.
+ * 요청은 **한 번**이다. 예전에는 세 번이었고 그중 둘은 순서대로 기다려야 했다 —
+ * 활성 세션을 먼저 물어봐야 오늘의 렌즈를 뽑을지 정할 수 있었기 때문이다. 그 판단은
+ * 서버에서 하면 왕복이 필요 없어서 `/api/home`으로 합쳤다(그 라우트 주석 참고).
+ * 매일 여는 화면이 오늘의 문장을 보여주기까지 기다리는 왕복이 둘 줄었다.
  */
 async function fetchHome(): Promise<HomeData> {
-  const activeResult = await fetchJson<{ snapshot: { session: TrainingSession } | null }>(
-    "/api/sessions?status=active",
+  const result = await fetchJson<HomePayload>(
+    `/api/home?timezone=${encodeURIComponent(detectTimezone())}`,
   );
-  if (!activeResult.ok) return { ok: false, message: activeResult.message };
-
-  const active = activeResult.data.snapshot;
-  if (active) {
-    const templatesResult = await fetchJson<{ templates: TrainingTemplate[] }>(
-      "/api/templates",
-    );
-    const template = templatesResult.ok
-      ? (templatesResult.data.templates.find((t) => t.id === active.session.templateId) ??
-        null)
-      : null;
-    return { ok: true, activeSession: active.session, template };
-  }
-
-  const todayResult = await fetchJson<{ template: TrainingTemplate }>(
-    `/api/templates/today?timezone=${encodeURIComponent(detectTimezone())}`,
-  );
-  if (!todayResult.ok) return { ok: false, message: todayResult.message };
-  return { ok: true, activeSession: null, template: todayResult.data.template };
+  if (!result.ok) return { ok: false, message: result.message };
+  return { ok: true, ...result.data };
 }
 
 /**
@@ -88,6 +77,9 @@ export default function HomePage() {
     }
     setActiveSession(result.activeSession);
     setTemplate(result.template);
+    setRecentRecord(result.recentRecord);
+    setRevisitCandidate(result.revisitCandidate?.session ?? null);
+    setRevisitDays(result.revisitCandidate?.days ?? 0);
     setStatus("ready");
   }, []);
 
@@ -100,23 +92,6 @@ export default function HomePage() {
       cancelled = true;
     };
   }, [apply]);
-
-  useEffect(() => {
-    let cancelled = false;
-    // 카드 두 개를 위해 기록 전체를 받아오지 않는다 — 서버가 골라서 준다(/api/home).
-    void fetchJson<{
-      recentRecord: SessionSummary | null;
-      revisitCandidate: { session: SessionSummary; days: number } | null;
-    }>(`/api/home?timezone=${encodeURIComponent(detectTimezone())}`).then((result) => {
-      if (cancelled || !result.ok) return;
-      setRecentRecord(result.data.recentRecord);
-      setRevisitCandidate(result.data.revisitCandidate?.session ?? null);
-      setRevisitDays(result.data.revisitCandidate?.days ?? 0);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   function handleRetry() {
     setStatus("loading");

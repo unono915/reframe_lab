@@ -31,6 +31,8 @@ export interface StageHint {
   pending: boolean;
   error: string | null;
   question: string | null;
+  /** 질문이 코치가 아니라 앱이 준비해둔 것일 때의 안내. 없으면 null. */
+  notice: string | null;
   /** 지금까지 실제로 본 가장 강한 단계. 예외 경로의 조건이기도 하다. */
   usedHintLevel: HintLevel;
   request: () => Promise<void>;
@@ -59,6 +61,7 @@ export function useStageHint(
   const { snapshot, isSoloMode, requestHint } = useTrainingSession();
   const [received, setReceived] = useState(0);
   const [question, setQuestion] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -84,6 +87,7 @@ export function useStageHint(
       return;
     }
     setQuestion(result.question);
+    setNotice(result.notice ?? null);
     setReceived((count) => count + 1);
   }
 
@@ -94,8 +98,12 @@ export function useStageHint(
     pending,
     error,
     question,
+    notice,
     usedHintLevel,
     request,
-    clear: () => setQuestion(null),
+    clear: () => {
+      setQuestion(null);
+      setNotice(null);
+    },
   };
 }

@@ -48,6 +48,10 @@ export function HintPanel({
       )}
       {hint.question && !hint.pending && (
         <Card variant="coach">
+          {/* 코치가 준 질문인지, 앱이 준비해둔 질문인지 구분해서 말한다. */}
+          {hint.notice && (
+            <p className="mb-2 text-caption text-text-secondary">{hint.notice}</p>
+          )}
           <p className="text-body-lg text-ink">{hint.question}</p>
         </Card>
       )}

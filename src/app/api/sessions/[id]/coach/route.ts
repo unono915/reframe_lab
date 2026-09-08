@@ -198,6 +198,21 @@ export async function POST(
       session: { ...fresh.session, aiCallCount: fresh.session.aiCallCount + 1 },
     });
 
-    return NextResponse.json({ question: output.question, snapshot: saved });
+    /*
+      상한에 걸려 규칙 기반 질문으로 내려온 경우에는 그 사실을 함께 알린다.
+
+      예전에는 그냥 질문만 돌려줬다. 사용자에게는 코치가 준 질문과 구분되지 않아서,
+      **코치가 갑자기 밋밋해진 것처럼 보인다.** 화면이 조용히 다른 것을 주는 셈이라
+      이 저장소가 계속 경계해온 종류의 침묵이다. 단계별 힌트 자리가 늘어난 뒤로는
+      한 세션에서 상한에 닿는 일도 더 그럴듯해졌다.
+    */
+    return NextResponse.json({
+      question: output.question,
+      snapshot: saved,
+      notice:
+        errorCode === "session_call_cap_reached"
+          ? "오늘 이 훈련에서 코치를 부를 수 있는 횟수를 다 썼어요. 아래 질문은 앱이 준비해둔 것이에요."
+          : undefined,
+    });
   });
 }

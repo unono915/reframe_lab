@@ -101,3 +101,45 @@ test("혼자 하기 모드에서는 어느 단계에도 버튼이 없다", async
     page.getByRole("button", { name: "분류가 헷갈리면 질문 하나 받기" }),
   ).toHaveCount(0);
 });
+
+test.describe("앱이 준비해둔 질문", () => {
+  // `page.route` 가로채기는 Service Worker가 먼저 요청을 집으면 닿지 않는다 —
+  // WebKit에서 실제로 그랬고, 이 저장소가 이미 두 번 빠진 함정이다.
+  test.use({ serviceWorkers: "block" });
+
+  test("앱이 준비해둔 질문이면 그렇다고 말한다", async ({ page }) => {
+    /*
+      한 세션의 AI 호출 상한에 닿으면 서버는 규칙 기반 질문으로 내려준다(원칙 8 —
+      막히지 않게 하는 장치다). 예전에는 그 질문만 돌려줘서 **코치가 갑자기 밋밋해진
+      것처럼** 보였다. 화면이 조용히 다른 것을 주는 셈이라, 이 저장소가 계속 경계해온
+      종류의 침묵이다. 단계별 힌트 자리가 늘어난 뒤로는 상한에 닿는 일도 더 그럴듯해졌다.
+
+      상한까지 실제로 15번 부르는 대신 응답만 흉내 낸다 — 확인할 것은 "안내가 화면에
+      닿는가"이고, 상한 판정 자체는 서버 쪽 코드다.
+    */
+    await page.route("**/api/sessions/*/coach", async (route) => {
+      const current = await page.request.get("/api/sessions?status=active");
+      const body = (await current.json()) as { snapshot: unknown };
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          question: "이 장면을 실제로 본 시간과 장소는 어디였나요?",
+          notice: "오늘 이 훈련에서 코치를 부를 수 있는 횟수를 다 썼어요.",
+          ...body,
+        }),
+      });
+    });
+
+    await page.goto("/training/new");
+    await expect(page.getByText("1 / 7 관찰")).toBeVisible();
+    await settle(page);
+    await page.getByLabel("관찰한 장면").fill(DEFAULT_CONTENT.observation);
+    await page.getByRole("button", { name: ASK }).click();
+
+    await expect(page.getByText("코치를 부를 수 있는 횟수를 다 썼어요")).toBeVisible();
+    await expect(
+      page.getByText("이 장면을 실제로 본 시간과 장소는 어디였나요?"),
+    ).toBeVisible();
+  });
+});

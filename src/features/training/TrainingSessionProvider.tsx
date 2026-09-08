@@ -161,7 +161,9 @@ export interface TrainingSessionContextValue {
   /** `ok: true`의 question은 항상 공백이 아니다 — 빈 응답은 실패로 변환된다. */
   requestHint: (
     hintLevel: HintLevel,
-  ) => Promise<{ ok: true; question: string } | { ok: false; message: string }>;
+  ) => Promise<
+    { ok: true; question: string; notice?: string } | { ok: false; message: string }
+  >;
   requestFeedback: () => Promise<
     { ok: true; feedback: AIFeedback } | { ok: false; message: string }
   >;
@@ -561,7 +563,9 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
   const requestHint = useCallback(
     (
       hintLevel: HintLevel,
-    ): Promise<{ ok: true; question: string } | { ok: false; message: string }> =>
+    ): Promise<
+      { ok: true; question: string; notice?: string } | { ok: false; message: string }
+    > =>
       enqueue(async () => {
         const current = snapshotRef.current;
         if (!current) return { ok: false, message: "세션이 아직 준비되지 않았습니다." };
@@ -574,6 +578,7 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
           {
             question: string | null;
             snapshot: TrainingSessionSnapshot;
+            notice?: string;
           } & Partial<ApiErrorBody>
         >(response);
         if (!response.ok || !body) {
@@ -596,7 +601,7 @@ export function TrainingSessionProvider({ children }: { children: ReactNode }) {
             message: "힌트를 받지 못했어요. 잠시 후 다시 시도해주세요.",
           };
         }
-        return { ok: true, question };
+        return { ok: true, question, notice: body.notice };
       }),
     [enqueue, commit],
   );

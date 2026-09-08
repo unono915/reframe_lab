@@ -31,9 +31,14 @@ export interface GuardrailContext {
 
 export interface GuardrailResult {
   ok: boolean;
-  /** 통과 시(또는 근거만 걸러내고 통과 가능할 때) 정리된 output. 실패 시 원본 그대로. */
+  /** 통과 시(또는 고칠 수 있는 부분만 고쳐 통과할 때) 정리된 output. 실패 시 원본 그대로. */
   output: CoachOutputSchema;
   violations: GuardrailErrorCode[];
+  /**
+   * 응답을 버리지 않고 **고쳐서** 통과시킨 항목. 사용자에게는 문제가 닿지 않지만,
+   * 모델이 규칙을 어겼다는 사실 자체는 기록에 남아야 다음에 프롬프트를 고칠 수 있다.
+   */
+  repairs: GuardrailErrorCode[];
 }
 
 const QUESTION_MARK_PATTERN = /[?？]/;
@@ -316,9 +321,25 @@ export function runCoachGuardrails(
   context: GuardrailContext,
 ): GuardrailResult {
   const violations: GuardrailErrorCode[] = [];
+  const repairs: GuardrailErrorCode[] = [];
+  let coachMessage = output.coachMessage;
 
   const questionCountViolation = checkSingleQuestion(output);
-  if (questionCountViolation) violations.push(questionCountViolation);
+  if (questionCountViolation === "question_mark_in_message") {
+    /*
+      버리지 않고 고친다. `coachMessage`는 **화면에 표시되지 않는다** — 힌트 경로는
+      `question`만 돌려주고 UI도 그것만 그린다. 그런데도 여기에 물음표가 있다는 이유로
+      응답 전체를 버리면, 멀쩡한 질문 하나를 잃고 사용자는 규칙 기반 fallback을 받는다.
+      실측에서 10번 중 3번이 이 이유로 버려지고 있었다.
+
+      근거 필터링(3번)이 이미 쓰는 방식과 같다 — 고칠 수 있는 부분은 고치고, 고칠 수
+      없는 것만 버린다. 대신 고쳤다는 사실은 `repairs`로 남긴다.
+    */
+    coachMessage = "";
+    repairs.push("question_mark_in_message");
+  } else if (questionCountViolation) {
+    violations.push(questionCountViolation);
+  }
   if (!checkAskHasQuestion(output)) violations.push("missing_question");
 
   const evidence = checkEvidence(output, context.userText);
@@ -335,13 +356,14 @@ export function runCoachGuardrails(
     violations.push("repeated_question");
 
   if (violations.length > 0) {
-    return { ok: false, output, violations };
+    return { ok: false, output, violations, repairs };
   }
 
   return {
     ok: true,
-    output: { ...output, evidenceReferences: evidence.evidenceReferences },
+    output: { ...output, coachMessage, evidenceReferences: evidence.evidenceReferences },
     violations: [],
+    repairs,
   };
 }
 

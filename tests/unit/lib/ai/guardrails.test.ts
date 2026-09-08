@@ -30,10 +30,15 @@ describe("runCoachGuardrails — 정상 응답", () => {
 });
 
 describe("runCoachGuardrails — 위반 감지", () => {
-  it("coachMessage에 물음표가 또 있으면 위반 — 질문 자리가 둘이 된다", () => {
+  it("coachMessage의 물음표는 버리지 않고 고쳐서 통과시킨다", () => {
+    // coachMessage는 화면에 표시되지 않는다 — 힌트 경로는 question만 돌려준다.
+    // 보이지도 않는 물음표 때문에 멀쩡한 질문을 버리면 사용자만 손해다.
     const result = runCoachGuardrails(MULTIPLE_QUESTIONS_OUTPUT, baseContext);
-    expect(result.ok).toBe(false);
-    expect(result.violations).toContain("question_mark_in_message");
+    expect(result.ok).toBe(true);
+    expect(result.output.coachMessage).toBe("");
+    // 고쳤다는 사실은 기록에 남는다 — 프롬프트를 고칠 근거가 된다.
+    expect(result.repairs).toContain("question_mark_in_message");
+    expect(result.violations).not.toContain("question_mark_in_message");
   });
 
   /**
@@ -140,7 +145,7 @@ describe("runCoachGuardrails — 위반 감지", () => {
       { ...MULTIPLE_QUESTIONS_OUTPUT, evidenceReferences: ["없는 문구"] },
       baseContext,
     );
-    expect(result.violations).toContain("question_mark_in_message");
+    expect(result.repairs).toContain("question_mark_in_message");
     expect(result.violations).toContain("unverified_evidence");
   });
 });
@@ -413,12 +418,14 @@ describe("checkSingleQuestion — 한 번에 하나만", () => {
     expect(violations(question)).toContain("multiple_questions");
   });
 
-  it("coachMessage에 물음표가 있으면 다른 코드로 막는다 — 원인이 다르면 고칠 곳도 다르다", () => {
+  it("coachMessage의 물음표는 고쳐서 통과시키고 기록만 남긴다", () => {
     const result = runCoachGuardrails(
       { ...base, coachMessage: "그게 정말인가요?", question: "무엇이 달랐나요?" },
       context,
     );
-    expect(result.violations).toContain("question_mark_in_message");
+    expect(result.ok).toBe(true);
+    expect(result.output.coachMessage).toBe("");
+    expect(result.repairs).toContain("question_mark_in_message");
   });
 
   it("접속사로 이어붙인 두 질문은 세지 못한다 — 프롬프트가 맡는 경계다", () => {

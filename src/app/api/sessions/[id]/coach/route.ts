@@ -65,7 +65,16 @@ async function getValidatedCoachOutput(
       recentQuestions,
     });
     if (guardrail.ok) {
-      return { output: guardrail.output, status: "ok" };
+      // 고쳐서 통과시킨 항목이 있으면 기록에 남긴다 — 사용자에게는 닿지 않았지만
+      // 모델이 규칙을 어겼다는 사실은 다음 프롬프트 수정의 근거가 된다.
+      return {
+        output: guardrail.output,
+        status: "ok",
+        errorCode:
+          guardrail.repairs.length > 0
+            ? `repaired:${guardrail.repairs.join(",")}`
+            : undefined,
+      };
     }
     // 어느 검사가 걸렸는지까지 남긴다 — "해결책 제안"이 잦으면 프롬프트 문제이고,
     // "반복 질문"이 잦으면 컨텍스트 구성 문제다. 대응이 서로 다르다.

@@ -138,7 +138,25 @@ function checkQuestioning(snapshot: TrainingSessionSnapshot): RequirementCheck {
     return metNormally();
   }
 
-  const reachedHintLevel2 = snapshot.questions.some((q) => q.hintLevelUsed >= 2);
+  /*
+    "반복적인 막힘"의 증거는 두 가지 모양으로 남는다(PRD §6.3).
+
+    ① 가장 강한 힌트를 본 **뒤에 다시 써본** 질문 — `hintLevelUsed >= 2`
+    ② 이 단계에서 실제로 받은 **Level 2 힌트 자체** — 코치 상호작용 기록
+
+    예전에는 ①만 봤다. 그런데 화면은 ②를 기준으로 예외 입력란을 열어준다. 그래서
+    힌트를 끝까지 받고도 더 쓸 말이 없던 사람은 **입력란에 사유를 적고 눌렀는데
+    서버가 거절하는** 막다른 길에 갇혔다 — 예외 경로가 존재하는 이유가 바로 그
+    사람인데도. PRD §6.3은 "사용자를 실패 처리하지 않는다"고 못 박는다.
+
+    둘 중 하나면 인정한다. ①을 빼지 않는 이유는, 힌트를 받고 한 번 더 시도한 사람도
+    같은 자격이 있기 때문이다.
+  */
+  const reachedHintLevel2 =
+    snapshot.questions.some((q) => q.hintLevelUsed >= 2) ||
+    snapshot.coachInteractions.some(
+      (interaction) => interaction.stage === "questioning" && interaction.hintLevel >= 2,
+    );
   const exceptionAck = findStageResponse(
     snapshot,
     "questioning",

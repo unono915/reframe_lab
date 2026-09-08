@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { resetActiveSession } from "./helpers/cleanup";
-import { settle } from "./helpers/training-flow";
+import { fillStagesUntilQuestioning, settle } from "./helpers/training-flow";
 
 /**
  * 최소 요건을 못 채운 사람을 실패로 처리하지 않는 경로의 회귀 테스트 (PRD §6.3:
@@ -11,9 +11,10 @@ import { settle } from "./helpers/training-flow";
  * 종류의 경로가 조용히 죽는 것을 이 저장소는 이미 겪었다 — 온보딩 화면은 만들어져
  * 있었지만 어디서도 연결되지 않아 도달할 수 없었다.
  *
- * 여기서 확인하는 것은 관찰·구분 두 단계다. 질문 단계의 예외는 Level 2 힌트를 실제로
- * 받아야 열리므로(그게 "반복적인 막힘"의 정의다) 실제 제공자 호출 3회가 필요해 이
- * 파일에 넣지 않았다 — 그 경로는 브라우저와 DB로 직접 확인했다(AGENTS.md §3-D).
+ * 질문 단계의 예외는 Level 2 힌트를 **실제로 받아야** 열린다 — 그게 "반복적인 막힘"의
+ * 정의다. 실 제공자를 세 번 부르면 느리고 답도 매번 달라지므로, 코치 응답만 현재
+ * 스냅샷으로 흉내 내 클라이언트 쪽 판정을 결정적으로 확인한다. 실제 제공자로 도는
+ * 경로는 브라우저와 DB로 따로 확인했다(AGENTS.md §3-D).
  *
  * 막힌 사람이 쓰는 길이므로, **막혔다는 사실이 기록에 남는지**까지 본다. 그냥 넘겨주고
  * 끝이면 나중에 "이 사람은 요건을 채웠다"와 구분되지 않는다.
@@ -96,4 +97,74 @@ test("예외로 넘어간 사실이 기록에 남는다", async ({ page, request
   // 사유가 남아야 나중에 "요건을 채웠다"와 구분된다(PRD §6.3).
   expect(reasons?.length).toBeGreaterThan(0);
   expect(reasons?.[0]?.content).toContain("떠오르지 않아요");
+});
+
+/**
+ * 앞의 두 힌트만 흉내 내고, **Level 2 힌트는 진짜로 받는다.**
+ *
+ * 왜 전부 흉내 내지 않는가 — 예외 경로의 조건은 서버가 판정하고, 서버는 "이 단계에서
+ * Level 2 힌트를 실제로 받았는가"를 코치 상호작용 기록으로 본다. 요청을 전부
+ * 가로채면 그 기록이 생기지 않아 **화면만 확인하고 서버 판정은 하나도 검증하지 못한다**
+ * (실제로 그렇게 만들었다가 테스트가 통과하지 못해 알아챘다).
+ *
+ * 흉내 내는 응답의 스냅샷은 진짜를 쓴다. 클라이언트가 응답의 스냅샷을 그대로 상태로
+ * 삼기 때문에, 가짜를 주면 그 뒤 화면이 실제 데이터와 어긋난다.
+ */
+async function stubFirstTwoHints(page: import("@playwright/test").Page): Promise<void> {
+  let seen = 0;
+  await page.route("**/api/sessions/*/coach", async (route) => {
+    seen += 1;
+    if (seen > 2) {
+      await route.fallback();
+      return;
+    }
+    const current = await page.request.get("/api/sessions?status=active");
+    const body = (await current.json()) as { snapshot: unknown };
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ question: "지금 장면에서 무엇이 반복되나요?", ...body }),
+    });
+  });
+}
+
+test.describe("질문 단계 — 세 번 막힌 뒤에야 예외가 열린다", () => {
+  // `page.route` 가로채기는 Service Worker가 먼저 요청을 집으면 닿지 않는다
+  // (WebKit에서 실제로 그랬다 — `ai-failure-fallback.spec.ts`와 같은 함정).
+  test.use({ serviceWorkers: "block" });
+
+  test("Level 2 힌트를 본 뒤에 예외 입력란이 나타난다", async ({ page }) => {
+    test.slow(); // 마지막 힌트는 실 제공자를 부른다.
+    await stubFirstTwoHints(page);
+    await page.goto("/training/new");
+    await fillStagesUntilQuestioning(page);
+    await settle(page);
+
+    await page.getByLabel("새 질문").fill("왜 이 사람만 반복해서 늦을까?");
+    await page.getByRole("button", { name: "질문 추가하기" }).click();
+    await settle(page);
+
+    const exceptionField = page.getByLabel(
+      "질문이 더 떠오르지 않는다면, 이유를 적어주세요",
+    );
+
+    // 첫 힌트는 Level 0이다. 가장 강한 단계를 보기 전에는 문이 열리지 않는다.
+    await page.getByRole("button", { name: "힌트 보기" }).click();
+    await settle(page);
+    await expect(exceptionField).toHaveCount(0);
+
+    await page.getByRole("button", { name: "힌트 보기" }).click();
+    await settle(page);
+    await expect(exceptionField).toHaveCount(0);
+
+    // 세 번째가 Level 2 — 여기서부터 "반복적인 막힘"으로 본다. 이 요청만 진짜로
+    // 나가므로 실 제공자 응답을 기다린다(최대 20초).
+    await page.getByRole("button", { name: "힌트 보기" }).click();
+    await expect(exceptionField).toBeVisible({ timeout: 30_000 });
+
+    await exceptionField.fill("더는 다른 각도가 떠오르지 않아요");
+    await page.getByRole("button", { name: "다음 질문으로" }).click();
+
+    await expect(page.getByText("4 / 7 탐색")).toBeVisible();
+  });
 });

@@ -8,6 +8,7 @@ import {
 } from "@/domain/training/requirements";
 import {
   makeAIFeedback,
+  makeCoachInteraction,
   makeObservation,
   makeObservationItem,
   makePerspective,
@@ -168,9 +169,48 @@ describe("checkStageRequirement — questioning", () => {
     });
   });
 
+  it("is met via exception when the strongest hint was actually received", () => {
+    /*
+      화면은 "Level 2 힌트를 봤는가"로 예외 입력란을 연다. 서버가 "그 뒤에 질문을 또
+      썼는가"만 봤을 때는, 힌트를 끝까지 받고도 더 쓸 말이 없던 사람이 사유를 적고
+      눌러도 거절당했다 — 예외 경로가 존재하는 이유가 바로 그 사람인데도.
+    */
+    const snapshot = makeSnapshot({
+      questions: [makeQuestion({ hintLevelUsed: 0 })],
+      coachInteractions: [makeCoachInteraction({ stage: "questioning", hintLevel: 2 })],
+      stageResponses: [
+        makeStageResponse({
+          stage: "questioning",
+          promptKey: EXCEPTION_PROMPT_KEYS.questioning,
+          content: "더는 다른 각도가 떠오르지 않아요",
+        }),
+      ],
+    });
+    expect(checkStageRequirement("questioning", snapshot)).toEqual({
+      met: true,
+      viaException: true,
+    });
+  });
+
+  it("다른 단계에서 받은 Level 2 힌트는 이 단계의 근거가 되지 않는다", () => {
+    const snapshot = makeSnapshot({
+      questions: [makeQuestion({ hintLevelUsed: 0 })],
+      coachInteractions: [makeCoachInteraction({ stage: "exploration", hintLevel: 2 })],
+      stageResponses: [
+        makeStageResponse({
+          stage: "questioning",
+          promptKey: EXCEPTION_PROMPT_KEYS.questioning,
+          content: "사유",
+        }),
+      ],
+    });
+    expect(checkStageRequirement("questioning", snapshot).met).toBe(false);
+  });
+
   it("rejects the exception path below hint level 2", () => {
     const snapshot = makeSnapshot({
       questions: [makeQuestion({ hintLevelUsed: 1 })],
+      coachInteractions: [makeCoachInteraction({ stage: "questioning", hintLevel: 1 })],
       stageResponses: [
         makeStageResponse({
           stage: "questioning",

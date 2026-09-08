@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  exceptionReasonInputSchema,
   explorationResponseInputSchema,
   observationInputSchema,
   observationItemInputSchema,
@@ -131,5 +132,58 @@ describe("stageResponseInputSchema / explorationResponseInputSchema", () => {
         content: "모르겠다",
       }).success,
     ).toBe(true);
+  });
+});
+
+/**
+ * 예외 사유 경로로 **예약 표식**을 쓸 수 없어야 한다.
+ *
+ * 이 앱은 `stage_responses`의 promptKey를 표식으로도 쓴다 — "오늘은 혼자 해보기"
+ * (`solo_mode`), 자기 점검 답변(`self_check_*`), 자기 점검 완료
+ * (`self_checklist_completed`). 예외 사유 저장이 아무 promptKey나 받아주면 요청
+ * 하나로 세션에 없던 표식이 생기고, 전이 프로브의 전제("사용자의 명시적 선택이
+ * 있어야만 센다")가 무너진다. 그러면 Growth의 "혼자 해낸 기록"은 예전에 한 번
+ * 그랬던 것처럼 다시 허위 신호가 된다.
+ *
+ * 클라이언트 타입은 이미 좁혀져 있지만 그건 클라이언트의 약속일 뿐이다 — 서버는
+ * 클라이언트가 보낸 값을 신뢰하지 않는다(원칙 6).
+ */
+describe("exceptionReasonInputSchema", () => {
+  it("네 단계의 예외 사유 키만 받는다", () => {
+    for (const promptKey of [
+      "observation_limit_reason",
+      "insufficient_facts_reason",
+      "questioning_exception_reason",
+      "reframe_exception_reason",
+    ]) {
+      expect(
+        exceptionReasonInputSchema.safeParse({ promptKey, content: "이유" }).success,
+        promptKey,
+      ).toBe(true);
+    }
+  });
+
+  it("예약 표식은 거부한다", () => {
+    for (const promptKey of [
+      "solo_mode",
+      "self_checklist_completed",
+      "self_check_scope",
+      "affected_user",
+      "아무거나",
+    ]) {
+      expect(
+        exceptionReasonInputSchema.safeParse({ promptKey, content: "이유" }).success,
+        promptKey,
+      ).toBe(false);
+    }
+  });
+
+  it("내용 규칙은 예전과 같다", () => {
+    expect(
+      exceptionReasonInputSchema.safeParse({
+        promptKey: "observation_limit_reason",
+        content: "   ",
+      }).success,
+    ).toBe(false);
   });
 });

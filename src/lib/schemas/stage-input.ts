@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { SELF_CHECK_ITEMS, type SelfCheckKey } from "@/domain/training/requirements";
+import {
+  EXCEPTION_PROMPT_KEYS,
+  SELF_CHECK_ITEMS,
+  type SelfCheckKey,
+} from "@/domain/training/requirements";
 
 /**
  * 단계별 사용자 입력 Zod 스키마. Client(react-hook-form)·Server(Route Handler, Phase 3)가
@@ -208,3 +212,27 @@ export const explorationResponseInputSchema = stageResponseInputSchema.extend({
   promptKey: explorationPromptKeySchema,
 });
 export type ExplorationResponseInput = z.infer<typeof explorationResponseInputSchema>;
+
+/**
+ * 예외 사유 전용 스키마.
+ *
+ * `stageResponseInputSchema`는 `promptKey`를 아무 문자열이나 받는다. 그런데 이 앱은
+ * `stage_responses`의 promptKey를 **예약 표식**으로도 쓴다 — "오늘은 혼자 해보기"
+ * (`solo_mode`), 자기 점검 답변(`self_check_*`), 자기 점검 완료
+ * (`self_checklist_completed`). 예외 사유 저장 경로가 그 이름들을 그대로 받아주면,
+ * 잘못 만든 요청 하나로 세션에 없던 표식이 생긴다.
+ *
+ * 실제 피해는 남의 데이터가 아니라 **지표의 진실성**이다. 전이 프로브는 "사용자의
+ * 명시적 선택이 있어야만 센다"는 전제 위에 서 있고(P1-6), 그 전제가 깨지면 Growth의
+ * "혼자 해낸 기록"은 예전에 한 번 그랬던 것처럼 다시 허위 신호가 된다.
+ *
+ * 클라이언트 타입은 이미 이 네 개로 좁혀져 있지만, 그건 클라이언트의 약속일 뿐이다 —
+ * 서버는 클라이언트가 보낸 값을 신뢰하지 않는다(원칙 6). 목록은 `EXCEPTION_PROMPT_KEYS`
+ * 에서 파생시켜 드리프트를 막는다(`explorationResponseInputSchema`와 같은 방식).
+ */
+const exceptionPromptKeys = Object.values(EXCEPTION_PROMPT_KEYS);
+
+export const exceptionReasonInputSchema = stageResponseInputSchema.extend({
+  promptKey: z.enum(exceptionPromptKeys as [string, ...string[]]),
+});
+export type ExceptionReasonInput = z.infer<typeof exceptionReasonInputSchema>;

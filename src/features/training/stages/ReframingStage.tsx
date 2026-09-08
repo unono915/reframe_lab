@@ -7,17 +7,8 @@ import { INPUT_LIMITS } from "@/lib/schemas/stage-input";
 import { EXCEPTION_PROMPT_KEYS } from "@/domain/training/requirements";
 import { StageShell } from "../StageShell";
 import { useTrainingSession } from "../TrainingSessionProvider";
+import { PERSPECTIVE_LENS_LABELS } from "@/domain/training/stages";
 import { useMutationAction } from "../useMutationAction";
-
-const LENS_LABELS: Record<PerspectiveLens, string> = {
-  stakeholder: "사람 바꾸기",
-  timeframe: "시간 앞뒤",
-  scope: "범위 넓히기",
-  structure: "구조 보기",
-  counter_example: "반대 사례",
-  causality: "원인 다시 보기",
-  most_disadvantaged: "가장 불리한 입장",
-};
 
 export function ReframingStage() {
   const {
@@ -96,14 +87,14 @@ export function ReframingStage() {
         <Stack gap={3}>
           <p className="text-heading-3 font-bold text-ink">1. 관점 탐색</p>
           <Stack direction="row" gap={2} className="flex-wrap">
-            {(Object.keys(LENS_LABELS) as PerspectiveLens[]).map((lens) => (
+            {(Object.keys(PERSPECTIVE_LENS_LABELS) as PerspectiveLens[]).map((lens) => (
               <Button
                 key={lens}
                 type="button"
                 variant={perspectiveLens === lens ? "primary" : "secondary"}
                 onClick={() => setPerspectiveLens(lens)}
               >
-                {LENS_LABELS[lens]}
+                {PERSPECTIVE_LENS_LABELS[lens]}
               </Button>
             ))}
           </Stack>
@@ -128,7 +119,7 @@ export function ReframingStage() {
           {snapshot.perspectives.map((p) => (
             <Card key={p.id} variant="cream">
               <p className="text-caption font-bold text-brand-strong">
-                {LENS_LABELS[p.lensType]}
+                {PERSPECTIVE_LENS_LABELS[p.lensType]}
               </p>
               <p className="text-body text-ink">{p.content}</p>
             </Card>

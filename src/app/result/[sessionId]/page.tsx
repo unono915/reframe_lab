@@ -8,7 +8,7 @@ import type {
   TrainingSessionSnapshot,
   TrainingTemplate,
 } from "@/domain/types";
-import { sessionStatusLabel } from "@/domain/training/stages";
+import { PERSPECTIVE_LENS_LABELS, sessionStatusLabel } from "@/domain/training/stages";
 import {
   compareSelfAssessmentWithAi,
   overconfidentDimensions,
@@ -232,6 +232,13 @@ export default function ResultPage() {
     (r) => r.stage === "exploration" && !r.isDraft,
   );
   const userReframes = snapshot.reframes.filter((r) => r.authorType === "user");
+  /*
+    관점 탐색에서 쓴 메모도 기록의 일부다. 저장은 되고 있었는데 **어디에서도 다시
+    보이지 않았다** — 기록에도, 성장에도 없었다. 재정의 단계는 "다른 렌즈로 다시
+    보기"가 먼저고 프레임 작성이 그다음인데(PRD §8 5단계), 남는 것은 결과인 프레임뿐이라
+    나중에 읽으면 그 프레임이 어디서 나왔는지가 사라진다.
+  */
+  const userPerspectives = snapshot.perspectives.filter((p) => p.authorType === "user");
 
   /*
     그때 스스로 어떻게 판단했는지도 기록의 일부다. 저장은 P0-2부터 되고 있었는데
@@ -414,6 +421,22 @@ export default function ResultPage() {
                   <p key={r.id} className="text-body text-ink">
                     {r.content}
                   </p>
+                ))}
+              </Stack>
+            </Stack>
+          </Card>
+        )}
+
+        {userPerspectives.length > 0 && (
+          <Card variant="paper">
+            <Stack gap={2}>
+              <p className="text-label font-bold text-text-secondary">관점 탐색</p>
+              <Stack gap={2}>
+                {userPerspectives.map((p) => (
+                  <div key={p.id}>
+                    <Badge variant="neutral">{PERSPECTIVE_LENS_LABELS[p.lensType]}</Badge>
+                    <p className="mt-1 text-body text-ink">{p.content}</p>
+                  </div>
                 ))}
               </Stack>
             </Stack>

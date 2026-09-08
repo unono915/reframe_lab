@@ -1,4 +1,9 @@
-import { STAGES, type SessionStatus, type Stage } from "@/domain/types";
+import {
+  STAGES,
+  type PerspectiveLens,
+  type SessionStatus,
+  type Stage,
+} from "@/domain/types";
 
 /**
  * 활성 단계만의 순서(not_started 제외). 상태 전환·stale 전파 계산의 기준 인덱스다.
@@ -78,6 +83,20 @@ export function stageRationale(stage: Stage): string | null {
   if (stage === "not_started") return null;
   return STAGE_RATIONALE[stage];
 }
+
+/**
+ * 관점 탐색에 쓰는 렌즈 이름. `STAGE_LABELS`와 같은 이유로 여기 둔다 — 훈련 화면과
+ * 기록 화면이 같은 문자열을 각자 적으면 한쪽만 고쳤을 때 조용히 어긋난다.
+ */
+export const PERSPECTIVE_LENS_LABELS: Record<PerspectiveLens, string> = {
+  stakeholder: "사람 바꾸기",
+  timeframe: "시간 앞뒤",
+  scope: "범위 넓히기",
+  structure: "구조 보기",
+  counter_example: "반대 사례",
+  causality: "원인 다시 보기",
+  most_disadvantaged: "가장 불리한 입장",
+};
 
 export const TOTAL_ACTIVE_STAGES = STAGE_ORDER.length;
 

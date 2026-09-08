@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { runCoachGuardrails, runFeedbackGuardrails } from "@/lib/ai/guardrails";
+import {
+  runCoachGuardrails,
+  runFeedbackGuardrails,
+  checkNoSolution,
+} from "@/lib/ai/guardrails";
 import {
   FABRICATED_NUMBER_OUTPUT,
   GHOSTWRITING_OUTPUT,
@@ -230,5 +234,60 @@ describe("runFeedbackGuardrails", () => {
     );
     expect(result.ok).toBe(false);
     expect(result.violations).toContain("solution_suggested");
+  });
+});
+
+/**
+ * 해결책 제안 검사(원칙 3)는 양방향으로 틀릴 수 있고, 두 방향의 대가가 다르다.
+ *
+ * - **오탐**(좋은 코칭을 거부): 사용자는 맞춤 질문 대신 규칙 기반 fallback을 받는다.
+ *   조용히 매번 나빠지고, 화면에는 아무 이상도 보이지 않는다.
+ * - **미탐**(해결책을 통과): AI가 문제를 대신 풀어준다. 이 앱이 하지 않겠다고 한 바로 그것.
+ *
+ * 예전 구현은 **둘 다** 틀렸다 — `~해 보세요`를 통째로 위반으로 보고 예외를 세 개만
+ * 뒀기 때문에 이 앱의 코칭 어휘 대부분이 거부됐고, 정작 "담당자를 바꿔 보세요"는
+ * `해`로 끝나지 않아 그대로 통과했다.
+ */
+describe("checkNoSolution — 코칭과 해결책을 가른다", () => {
+  it.each([
+    "한 번 더 확인해 보세요.",
+    "두 문장을 비교해 보세요.",
+    "사실과 해석을 구분해 보세요.",
+    "무엇이 달라졌는지 정리해 보세요.",
+    "그 장면을 다시 관찰해 보세요.",
+    "스스로에게 질문해 보세요.",
+    "왜 그렇게 생각했는지 설명해 보세요.",
+    "그 순간을 조금 더 구체적으로 떠올려볼까요.",
+    "어떤 근거가 있었는지 살펴 보세요.",
+    "무엇이 사실인지 짚어 보세요.",
+    "본 것을 한 문장으로 적어주세요.",
+    "그때 무슨 일이 있었는지 말씀해주세요.",
+    "자신의 문장을 다시 읽어 보세요.",
+    "어떤 점이 달랐는지 되짚어 볼까요.",
+  ])("사고를 겨누는 권유는 통과한다: %s", (text) => {
+    expect(checkNoSolution(text)).toBe(true);
+  });
+
+  it.each([
+    "회의록 도구를 도입해 보세요.",
+    "담당자를 바꿔 보세요.",
+    "일정을 조정하면 됩니다.",
+    "규칙을 문서로 만드세요.",
+    "이렇게 해보세요.",
+    "리마인더를 설정하시길 추천합니다.",
+    "회의 시간을 늘리세요.",
+  ])("문제에 손대라는 권유는 막는다: %s", (text) => {
+    expect(checkNoSolution(text)).toBe(false);
+  });
+
+  it("권유가 아예 없는 문장은 검사 대상이 아니다", () => {
+    expect(checkNoSolution("그 장면에서 확인된 사실은 무엇인가요?")).toBe(true);
+  });
+
+  it("한 문장에 코칭과 해결책이 섞여 있으면 막는다", () => {
+    // 앞의 코칭을 걷어내도 뒤의 해결책이 남는다 — 그걸 잡는 것이 이 구조의 핵심이다.
+    expect(checkNoSolution("먼저 확인해 보세요. 그리고 담당자를 바꿔 보세요.")).toBe(
+      false,
+    );
   });
 });

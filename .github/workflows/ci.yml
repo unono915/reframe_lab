@@ -18,7 +18,25 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run format:check
+
+      # RLS·RPC 통합 테스트는 Postgres에 직접 붙는다. 이 값이 없으면 vitest가 조용히
+      # skip하고 job은 초록으로 끝난다 — 이 저장소가 이미 두 번 당한 "아무것도 검증하지
+      # 않은 초록"이다. 워크플로 요약에 경고를 남겨 눈에 보이게 한다.
+      #
+      # ⚠️ 이 시크릿은 `docs/deployment.md` §6에 필요한 값으로 적혀 있었는데, 정작
+      # 워크플로 어디에도 전달되지 않고 있었다(2026-09-08 발견). 등록해도 아무 일이
+      # 일어나지 않는 상태였다.
+      - name: 통합 테스트 자격증명 확인
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::warning title=통합 테스트를 건너뜁니다::SUPABASE_DB_URL 시크릿이 없어 tests/integration/의 RLS 4건 + RPC 재조정 2건을 실행하지 않았습니다. 이 워크플로는 지금 데이터 접근 경계를 검증하지 못합니다."
+          fi
+
       - run: npm run test -- --coverage
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
       # 의존성 취약점 스캔(Phase 6 보안 점검). high 이상이면 실패한다 —
       # 빌드 도구의 전이 의존이라도 방치하면 계속 쌓인다.
       - run: npm audit --audit-level=high

@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { Stack } from "@/components/ui";
+import { PageState } from "@/components/ui";
 import {
   TrainingSessionProvider,
   useTrainingSession,
@@ -62,23 +62,25 @@ function TrainingRouteSync() {
   }, [status, snapshot, params.sessionId, router, wantsSolo, isSoloMode, searchParams]);
 
   if (status === "loading") {
-    return (
-      <main className="flex min-h-dvh items-center justify-center px-5">
-        <p className="text-body text-text-secondary">오늘의 훈련을 준비하고 있어요.</p>
-      </main>
-    );
+    return <PageState status="loading" loadingLabel="오늘의 훈련을 준비하고 있어요." />;
   }
 
   if (status === "error" || !snapshot) {
+    /*
+      다른 화면(Home·기록·성장·기록 상세)은 전부 `PageState`로 **다시 시도**를 준다.
+      이 화면만 오류 문구에서 끝나서, 세션 로딩이 한 번 실패하면 사용자가 직접
+      새로고침하는 것 말고는 빠져나갈 방법이 없었다 — 그런데 여기가 하필 작성 중인
+      내용이 걸려 있는 화면이다.
+
+      전체 새로고침으로 다시 시도한다. Provider의 로딩은 마운트 시 한 번 도는
+      구조라, 새로 그리는 것이 가장 확실하고 낡은 클라이언트 상태도 함께 정리된다.
+    */
     return (
-      <main className="flex min-h-dvh items-center justify-center px-5">
-        <Stack gap={2} align="center">
-          <p className="text-body font-bold text-danger">세션을 불러오지 못했어요.</p>
-          {errorMessage && (
-            <p className="text-caption text-text-secondary">{errorMessage}</p>
-          )}
-        </Stack>
-      </main>
+      <PageState
+        status="error"
+        message={errorMessage ?? "세션을 불러오지 못했어요."}
+        onRetry={() => window.location.reload()}
+      />
     );
   }
 

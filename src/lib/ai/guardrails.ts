@@ -35,10 +35,22 @@ export interface GuardrailResult {
 
 const QUESTION_MARK_PATTERN = /[?？]/;
 
-/** 2. 질문 개수 — question 필드 외에 coachMessage에도 물음표가 있으면 위반. */
+/**
+ * 2. 질문 개수 (원칙 2 — "AI는 한 번에 하나만 묻는다").
+ *
+ * 두 자리를 본다.
+ * 1. `coachMessage`에 물음표가 있으면 질문이 둘이 된다(원래 있던 검사).
+ * 2. **`question` 필드 안의 물음표 개수.** 이쪽은 검사하지 않고 있었다 — 모델이
+ *    "언제였나요? 어디였나요? 누가 있었나요?"를 한 필드에 담아 보내면 그대로
+ *    통과해서, 사용자는 한 번에 세 질문을 받는다. 이 앱이 하지 않겠다고 한 바로 그것이다.
+ *
+ * 물음표 없이 접속사로 이어붙인 경우("왜 그렇게 보셨고, 무엇이 근거였나요?")는
+ * 어휘로 세기 어렵다. 그건 프롬프트가 맡는다.
+ */
 function checkSingleQuestion(output: CoachOutputSchema): boolean {
   if (output.question === null) return true;
-  return !QUESTION_MARK_PATTERN.test(output.coachMessage);
+  if (QUESTION_MARK_PATTERN.test(output.coachMessage)) return false;
+  return (output.question.match(/[?？]/g) ?? []).length <= 1;
 }
 
 /**
@@ -162,6 +174,16 @@ const THINKING_VERB_STEMS = [
   "묘사",
   "회상",
   "복기",
+  "해석",
+  "판단",
+  "평가",
+  "요약",
+  "대조",
+  "검증",
+  "탐색",
+  "상기",
+  "구별",
+  "정의",
 ];
 
 /**
@@ -182,6 +204,18 @@ const THINKING_VERB_FORMS = [
   "읽어",
   "써",
   "봐",
+  "들여다",
+  "되돌아",
+  "뜯어",
+  "알아",
+  "찾아",
+  "견줘",
+  "견주어",
+  "눈여겨",
+  "따라가",
+  "돌이켜",
+  "떠올려",
+  "물어",
 ];
 
 /** 무엇을 하라고 권하는 어미. 이게 없으면 애초에 해결책 제안이 아니다. */

@@ -260,6 +260,13 @@ describe("checkNoSolution — 코칭과 해결책을 가른다", () => {
     "그 순간을 조금 더 구체적으로 떠올려볼까요.",
     "어떤 근거가 있었는지 살펴 보세요.",
     "무엇이 사실인지 짚어 보세요.",
+    "조금 더 들여다볼까요.",
+    "다른 사례와 견줘 보세요.",
+    "그 장면을 되돌아 보세요.",
+    "무엇이 빠졌는지 뜯어 보세요.",
+    "어떤 근거가 있는지 찾아 보세요.",
+    "다른 관점을 탐색해 보세요.",
+    "스스로에게 물어 보세요.",
     "본 것을 한 문장으로 적어주세요.",
     "그때 무슨 일이 있었는지 말씀해주세요.",
     "자신의 문장을 다시 읽어 보세요.",
@@ -276,6 +283,8 @@ describe("checkNoSolution — 코칭과 해결책을 가른다", () => {
     "이렇게 해보세요.",
     "리마인더를 설정하시길 추천합니다.",
     "회의 시간을 늘리세요.",
+    "알림을 켜세요.",
+    "프로세스를 개선해 보세요.",
   ])("문제에 손대라는 권유는 막는다: %s", (text) => {
     expect(checkNoSolution(text)).toBe(false);
   });
@@ -358,5 +367,64 @@ describe("checkNoGhostwriting — 정의를 대신 써주면 막는다", () => {
       { ...context, currentStage: "observation" },
     );
     expect(atObservation.violations).not.toContain("ghostwriting");
+  });
+});
+
+/**
+ * 원칙 2("AI는 한 번에 하나만 묻는다")는 이 앱에서 가장 두드러진 제약이다 —
+ * 일반 AI 채팅과 방향이 반대라는 주장의 핵심이 여기 있다.
+ *
+ * 그런데 검사는 `coachMessage`의 물음표만 보고 있었다. 모델이 세 질문을 `question`
+ * 한 필드에 담아 보내면 그대로 통과해서, 사용자는 한 번에 셋을 받는다.
+ */
+describe("checkSingleQuestion — 한 번에 하나만", () => {
+  const base = {
+    currentStage: "questioning" as const,
+    action: "ask" as const,
+    coachMessage: "조금 더 봅시다.",
+    detectedGaps: [],
+    evidenceReferences: [],
+    hintLevel: 0 as const,
+    suggestedNextStage: null,
+    safetyFlags: [],
+  };
+  const context = {
+    currentStage: "questioning" as const,
+    userText: "회의 때마다 한 사람이 늦게 들어온다",
+    recentQuestions: [],
+  };
+  const violations = (question: string) =>
+    runCoachGuardrails({ ...base, question }, context).violations;
+
+  it("질문 하나는 통과한다", () => {
+    expect(violations("그때 무슨 일이 있었나요?")).not.toContain("multiple_questions");
+  });
+
+  it("물음표가 없어도 하나면 통과한다", () => {
+    expect(violations("무엇이 달랐는지 한 문장으로 적어주세요.")).not.toContain(
+      "multiple_questions",
+    );
+  });
+
+  it.each([
+    "언제였나요? 그리고 누가 함께 있었나요?",
+    "언제였나요? 어디였나요? 누가 있었나요?",
+  ])("question 필드에 질문이 여러 개면 막는다: %s", (question) => {
+    expect(violations(question)).toContain("multiple_questions");
+  });
+
+  it("coachMessage에 물음표가 있어도 막는다 — 그러면 질문이 둘이 된다", () => {
+    const result = runCoachGuardrails(
+      { ...base, coachMessage: "그게 정말인가요?", question: "무엇이 달랐나요?" },
+      context,
+    );
+    expect(result.violations).toContain("multiple_questions");
+  });
+
+  it("접속사로 이어붙인 두 질문은 세지 못한다 — 프롬프트가 맡는 경계다", () => {
+    // 물음표가 하나뿐이라 어휘로는 구분할 수 없다. 한계를 적어둔다.
+    expect(violations("왜 그렇게 보셨고, 무엇이 근거였나요?")).not.toContain(
+      "multiple_questions",
+    );
   });
 });

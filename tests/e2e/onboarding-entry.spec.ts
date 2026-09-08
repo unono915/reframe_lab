@@ -39,3 +39,27 @@ test("깊은 링크로 온 사람은 소개 화면을 거치지 않는다", asyn
   await page.goto("/history");
   await expect(page).toHaveURL(/\/auth\/login\?next=%2Fhistory/);
 });
+
+test("보던 자리에서 이어서 본다", async ({ page }) => {
+  /*
+    PRD F-01: "사용자가 중간에 종료하면 다음 실행 시 마지막 온보딩 단계부터 재개한다"
+    (완료 조건에도 같은 항목이 있다). 화면 상태로만 들고 있어서 앱을 닫으면 처음
+    화면으로 돌아갔다 — 세 화면짜리라 크게 불편하진 않지만, 정한 것을 안 하고 있었다.
+  */
+  await page.goto("/onboarding");
+  await expect(page.getByRole("progressbar")).toHaveAccessibleName("온보딩 1 / 3");
+
+  await page.getByRole("button", { name: "다음" }).click();
+  await expect(page.getByRole("progressbar")).toHaveAccessibleName("온보딩 2 / 3");
+
+  // 앱을 닫았다 다시 여는 것과 같다.
+  await page.goto("/onboarding");
+  await expect(page.getByRole("progressbar")).toHaveAccessibleName("온보딩 2 / 3");
+
+  // 다 보고 나면 진행 기록은 지운다 — 다시 올 일이 없다.
+  await page.getByRole("button", { name: "다음" }).click();
+  await page.getByRole("link", { name: "시작하기" }).click();
+  await expect(page).toHaveURL(/\/auth\/login/);
+  const saved = await page.evaluate(() => window.localStorage.getItem("onboarding_step"));
+  expect(saved).toBeNull();
+});

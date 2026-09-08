@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { Button, LinkButton, Stack } from "@/components/ui";
 
 /**
@@ -13,6 +13,48 @@ import { Button, LinkButton, Stack } from "@/components/ui";
 function markOnboardingSeen(): void {
   const oneYear = 60 * 60 * 24 * 365;
   document.cookie = `onboarding_seen=1; path=/; max-age=${oneYear}; samesite=lax`;
+  clearProgress();
+}
+
+/**
+ * 어디까지 봤는지. PRD F-01은 "사용자가 중간에 종료하면 다음 실행 시 마지막 온보딩
+ * 단계부터 재개한다"고 정하고 완료 조건에도 같은 항목이 있는데, 지금까지는 화면
+ * 상태로만 들고 있어서 앱을 닫으면 처음 화면으로 돌아갔다.
+ *
+ * 서버에 둘 이유는 없다 — 로그인 전 화면이고, 잃어도 소개를 한 번 더 볼 뿐이다.
+ * 사생활 보호 모드처럼 저장소 접근 자체가 막힌 환경이 있어 읽기·쓰기 모두 감싼다.
+ */
+const PROGRESS_KEY = "onboarding_step";
+
+/** 이 값을 바꾸는 것은 이 화면뿐이라 외부 변경 알림이 필요 없다. */
+function subscribeNothing(): () => void {
+  return () => {};
+}
+
+function readProgress(): number {
+  try {
+    const raw = window.localStorage.getItem(PROGRESS_KEY);
+    const parsed = raw === null ? 0 : Number.parseInt(raw, 10);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function saveProgress(index: number): void {
+  try {
+    window.localStorage.setItem(PROGRESS_KEY, String(index));
+  } catch {
+    // 저장하지 못해도 온보딩 자체는 볼 수 있어야 한다.
+  }
+}
+
+function clearProgress(): void {
+  try {
+    window.localStorage.removeItem(PROGRESS_KEY);
+  } catch {
+    // 지우지 못해도 `onboarding_seen` 쿠키가 있으면 이 화면으로 다시 오지 않는다.
+  }
 }
 
 /**
@@ -62,7 +104,19 @@ const STEPS: OnboardingStep[] = [
 ];
 
 export default function OnboardingPage() {
-  const [index, setIndex] = useState(0);
+  /*
+    이어서 볼 자리는 브라우저에만 있는 값이라 서버 렌더에는 없다. `useSyncExternalStore`
+    는 정확히 그 경우를 위한 것이다 — 서버 스냅샷은 0으로 그리고, 클라이언트에서
+    저장된 값으로 다시 그린다. 초기 state에서 곧바로 읽으면 hydration이 어긋나고,
+    effect에서 setState하면 렌더가 한 번 더 도는 것을 lint가 막는다.
+
+    쓰는 쪽은 우리뿐이라 구독은 아무 일도 하지 않는다. 사용자가 "다음"을 누르면
+    `advanced`가 그 값을 덮는다.
+  */
+  const restored = useSyncExternalStore(subscribeNothing, readProgress, () => 0);
+  const [advanced, setAdvanced] = useState<number | null>(null);
+  const index = Math.min(advanced ?? restored, STEPS.length - 1);
+  const setIndex = (next: (current: number) => number) => setAdvanced(next(index));
   // STEPS는 상수라 인덱스가 벗어날 수 없지만, noUncheckedIndexedAccess 아래에서는
   // 타입상 undefined가 가능하다 — 단언 대신 첫 화면으로 떨어뜨린다.
   const step = STEPS[index] ?? STEPS[0]!;
@@ -113,7 +167,13 @@ export default function OnboardingPage() {
               type="button"
               variant="primary"
               fullWidth
-              onClick={() => setIndex((i) => i + 1)}
+              onClick={() =>
+                setIndex((i) => {
+                  const next = i + 1;
+                  saveProgress(next);
+                  return next;
+                })
+              }
             >
               다음
             </Button>

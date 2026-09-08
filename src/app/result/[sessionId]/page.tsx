@@ -210,11 +210,28 @@ export default function ResultPage() {
   const comparisons = compareSelfAssessmentWithAi(snapshot, feedback ?? null);
   const overconfident = overconfidentDimensions(comparisons);
 
+  /*
+    기록 목록은 완료된 것만 담지 않는다 — 진행 중이거나 보류한 세션도 함께 보여주고,
+    누르면 이 화면으로 온다. 그런데 이 화면은 그 모든 경우에 "지금의 생각을
+    기록했어요"라고 말하고 있었다. 아직 쓰는 중인 사람에게 끝났다고 말한 셈이고,
+    **이어서 할 방법도 여기 없었다** — 홈으로 돌아가는 길을 스스로 찾아야 했다.
+  */
+  const isCompleted = snapshot.session.status === "completed";
+  const canResume = !isCompleted && snapshot.session.status !== "abandoned";
+
   return (
     <main className="pt-safe pb-safe mx-auto flex min-h-dvh max-w-[640px] flex-col gap-8 px-5 py-10">
       <Stack gap={2}>
         <Stack direction="row" justify="between" align="center" gap={2}>
-          <p className="text-caption font-bold text-success">지금의 생각을 기록했어요.</p>
+          <p
+            className={
+              isCompleted
+                ? "text-caption font-bold text-success"
+                : "text-caption font-bold text-text-secondary"
+            }
+          >
+            {isCompleted ? "지금의 생각을 기록했어요." : "아직 마치지 않은 기록이에요."}
+          </p>
           <Button
             type="button"
             variant="tertiary"
@@ -440,15 +457,32 @@ export default function ResultPage() {
             {actionError}
           </p>
         )}
-        <Button
-          type="button"
-          variant="secondary"
-          fullWidth
-          onClick={handleRevisit}
-          disabled={revisitPending}
-        >
-          {revisitPending ? "새 기록을 만드는 중" : "이 장면 다시 생각하기"}
-        </Button>
+        {canResume && (
+          <Button
+            type="button"
+            variant="primary"
+            fullWidth
+            onClick={() => router.push(`/training/${snapshot.session.id}`)}
+          >
+            이어서 하기
+          </Button>
+        )}
+        {/*
+          다시 생각하기는 완료된 기록에서만 의미가 있다. 진행 중인 세션에서 누르면
+          서버가 "진행 중인 훈련이 있어요"로 거절하는데, 그건 사용자가 알아야 할
+          정보가 아니라 우리가 애초에 물어보지 말았어야 할 질문이다.
+        */}
+        {isCompleted && (
+          <Button
+            type="button"
+            variant="secondary"
+            fullWidth
+            onClick={handleRevisit}
+            disabled={revisitPending}
+          >
+            {revisitPending ? "새 기록을 만드는 중" : "이 장면 다시 생각하기"}
+          </Button>
+        )}
 
         {!confirmingDelete ? (
           <Button

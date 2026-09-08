@@ -1,0 +1,47 @@
+import { expect, test } from "@playwright/test";
+import { resetActiveSession } from "./helpers/cleanup";
+import { fillStagesUntilQuestioning, settle } from "./helpers/training-flow";
+
+/**
+ * 아직 마치지 않은 기록을 열었을 때의 회귀 테스트.
+ *
+ * 기록 목록은 완료된 것만 담지 않는다 — 진행 중이거나 보류한 세션도 함께 보여주고,
+ * 누르면 기록 상세로 온다. 그런데 그 화면은 모든 경우에 "지금의 생각을 기록했어요"
+ * 라고 말하고 있었다. **아직 쓰는 중인 사람에게 끝났다고 말한 것이고, 이어서 할
+ * 방법도 거기 없었다** — 홈으로 돌아가는 길을 스스로 찾아야 했다.
+ *
+ * 게다가 그 자리에 있던 "이 장면 다시 생각하기"는 진행 중인 세션에서는 서버가
+ * 거절한다("진행 중인 훈련이 있어요"). 사용자가 알아야 할 정보가 아니라, 우리가
+ * 애초에 물어보지 말았어야 할 질문이었다.
+ */
+test.skip(
+  !process.env.E2E_TEST_EMAIL || !process.env.E2E_TEST_PASSWORD,
+  "E2E_TEST_EMAIL/PASSWORD 미설정 — 로그인 필요한 E2E는 건너뜀 (.env.example 참고)",
+);
+
+test.beforeEach(async ({ request }) => {
+  await resetActiveSession(request);
+});
+
+test("마치지 않은 기록은 끝났다고 말하지 않고, 이어서 할 길을 준다", async ({ page }) => {
+  await page.goto("/training/new");
+  await fillStagesUntilQuestioning(page);
+  await settle(page);
+  const sessionId = (page.url().split("/training/")[1] ?? "").split("?")[0];
+  expect(sessionId).toBeTruthy();
+
+  await page.goto(`/result/${sessionId}`);
+
+  await expect(page.getByText("아직 마치지 않은 기록이에요.")).toBeVisible();
+  await expect(page.getByText("지금의 생각을 기록했어요.")).toHaveCount(0);
+  // 진행 중인 세션에서는 서버가 거절할 동작을 아예 내놓지 않는다.
+  await expect(page.getByRole("button", { name: "이 장면 다시 생각하기" })).toHaveCount(
+    0,
+  );
+
+  await page.getByRole("button", { name: "이어서 하기" }).click();
+
+  await expect(page).toHaveURL(new RegExp(`/training/${sessionId}`));
+  // 떠난 자리에서 그대로 이어진다.
+  await expect(page.getByText("3 / 7 질문")).toBeVisible();
+});

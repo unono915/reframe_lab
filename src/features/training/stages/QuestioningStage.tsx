@@ -22,7 +22,23 @@ export function QuestioningStage() {
     advance,
   } = useTrainingSession();
   const [text, setText] = useState("");
-  const [hintLevel, setHintLevel] = useState<HintLevel>(0);
+  /*
+    지금까지 **받은** 힌트 개수. 이것 하나에서 두 값을 파생시킨다.
+
+    예전에는 상태 하나(`hintLevel`)가 "다음에 요청할 단계"와 "지금까지 쓴 단계"를
+    겸했다. 첫 힌트(Level 0)를 받고 나면 값이 1이 되므로, 그 뒤에 쓴 질문에는
+    **실제로 쓴 적 없는 Level 1**이 기록됐다. PRD §7.6은 "힌트 수준과 사용 여부를
+    저장해 성장 지표에서 사용자 작성 결과와 구분한다"고 정하는데, 그 기록이 한 칸씩
+    부풀어 있었던 것이다.
+
+    같은 값이 예외 경로(질문 3개 미달 허용)의 문을 여는 조건이기도 해서
+    (`requirements.ts checkQuestioning`), 가장 강한 힌트를 보기 전에 문이 열렸다.
+  */
+  const [hintsReceived, setHintsReceived] = useState(0);
+  /** 다음에 요청할 단계 — 0 → 1 → 2에서 멈춘다. */
+  const nextHintLevel = Math.min(hintsReceived, 2) as HintLevel;
+  /** 지금까지 실제로 본 가장 강한 단계. 아직 안 받았으면 0으로 취급한다. */
+  const usedHintLevel = Math.max(hintsReceived - 1, 0) as HintLevel;
   const [hintText, setHintText] = useState<string | null>(null);
   const [hintPending, setHintPending] = useState(false);
   const [hintError, setHintError] = useState<string | null>(null);
@@ -42,7 +58,8 @@ export function QuestioningStage() {
     // 질문을 입력했을 때 뒤늦은 초기화가 그 입력을 지워버린다(실제로 재현됨: 연속으로
     // 질문 3개를 빠르게 추가하면 그중 하나가 조용히 사라졌다).
     const submitted = text;
-    const submittedHintLevel = hintLevel;
+    // 힌트를 한 번도 안 받았으면 0이다. 받았다면 **본 것 중 가장 강한** 단계다.
+    const submittedHintLevel = hintsReceived === 0 ? (0 as HintLevel) : usedHintLevel;
     setText("");
     setHintText(null);
     // 다음 항목을 바로 이어 쓸 수 있게 입력창으로 focus를 돌린다. **await 앞에서**
@@ -62,14 +79,15 @@ export function QuestioningStage() {
   async function handleHint() {
     setHintPending(true);
     setHintError(null);
-    const result = await requestHint(hintLevel);
+    const result = await requestHint(nextHintLevel);
     setHintPending(false);
     if (!result.ok) {
       setHintError(result.message);
       return;
     }
     setHintText(result.question);
-    setHintLevel((level) => (level < 2 ? ((level + 1) as HintLevel) : level));
+    // 실패한 요청은 세지 않는다 — 보지 못한 힌트를 "썼다"고 기록하면 안 된다.
+    setHintsReceived((count) => count + 1);
   }
 
   async function handleConfirmPriority(questionId: string) {
@@ -95,7 +113,7 @@ export function QuestioningStage() {
       latest?.questions.filter((q) => q.authorType === "user") ?? questions;
     const latestHasPriority = latestQuestions.some((q) => q.isPriority);
     if (latestQuestions.length < 3 || !latestHasPriority) {
-      if (latestQuestions.length >= 1 && hintLevel >= 2 && exceptionReason.trim()) {
+      if (latestQuestions.length >= 1 && usedHintLevel >= 2 && exceptionReason.trim()) {
         await submitExceptionReason(EXCEPTION_PROMPT_KEYS.questioning, exceptionReason);
       } else {
         return {
@@ -209,7 +227,7 @@ export function QuestioningStage() {
           </Card>
         )}
 
-        {questions.length >= 1 && hintLevel >= 2 && (
+        {questions.length >= 1 && usedHintLevel >= 2 && (
           <Field
             id="questioning-exception"
             label="질문이 더 떠오르지 않는다면, 이유를 적어주세요"

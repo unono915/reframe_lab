@@ -144,7 +144,22 @@ function applyMutation(
         current.session.currentStage,
         mutation.args,
       );
-      return { ...current, stageResponses: [...current.stageResponses, response] };
+      /*
+        같은 단계의 사유는 하나만 남긴다(탐색 응답·자기 점검과 같은 방식).
+
+        예전에는 그냥 덧붙였다. 그런데 요건 판정은 `find`로 **가장 먼저** 저장된 것을
+        읽으므로, 사유를 고쳐 다시 낸 사람의 기록에는 옛 문장이 남고 새 문장은
+        무시됐다. 사유는 "왜 못 채웠는지"를 남기는 자리라(PRD §6.3), 사용자가 마지막에
+        쓴 문장이 그 자리에 있어야 한다.
+      */
+      const withoutOld = current.stageResponses.filter(
+        (r) =>
+          !(
+            r.stage === current.session.currentStage &&
+            r.promptKey === mutation.args.promptKey
+          ),
+      );
+      return { ...current, stageResponses: [...withoutOld, response] };
     }
     case "enableSoloMode": {
       // 이미 켜져 있으면 중복 기록하지 않는다. 끄는 경로를 두지 않는 이유는,

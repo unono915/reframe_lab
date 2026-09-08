@@ -99,6 +99,52 @@ test("예외로 넘어간 사실이 기록에 남는다", async ({ page, request
   expect(reasons?.[0]?.content).toContain("떠오르지 않아요");
 });
 
+test("사유를 고쳐 다시 내면 마지막 문장이 남는다", async ({ page, request }) => {
+  /*
+    요건 판정은 저장된 사유 중 **가장 먼저** 온 것을 읽는다. 그래서 사유를 덧붙이기만
+    하면, 문장을 고쳐 다시 낸 사람의 기록에는 옛 문장이 남고 새 문장은 무시된다.
+    사유는 "왜 못 채웠는지"를 남기는 자리라(PRD §6.3), 마지막에 쓴 문장이 있어야 한다.
+
+    화면에서는 사유를 내면 곧바로 다음 단계로 넘어가서 두 번 낼 일이 잘 없다 —
+    그래서 API로 직접 두 번 낸다(저장이 실패해 다시 시도하는 경우가 그 모양이다).
+  */
+  await page.goto("/training/new");
+  await expect(page.getByText("1 / 7 관찰")).toBeVisible();
+  await settle(page);
+
+  const active = await request.get("/api/sessions?status=active");
+  const sessionId = (
+    (await active.json()) as { snapshot: { session: { id: string } } | null }
+  ).snapshot?.session.id;
+  expect(sessionId).toBeTruthy();
+
+  for (const content of ["첫 번째로 적은 사유", "고쳐서 다시 적은 사유"]) {
+    const res = await request.post(`/api/sessions/${sessionId}/mutate`, {
+      data: {
+        clientRequestId: crypto.randomUUID(),
+        mutation: {
+          action: "submitExceptionReason",
+          args: { promptKey: "observation_limit_reason", content },
+        },
+      },
+    });
+    expect(res.ok(), await res.text()).toBe(true);
+  }
+
+  const after = await request.get("/api/sessions?status=active");
+  const stageResponses =
+    (
+      (await after.json()) as {
+        snapshot: { stageResponses: { promptKey: string; content: string }[] } | null;
+      }
+    ).snapshot?.stageResponses.filter(
+      (r) => r.promptKey === "observation_limit_reason",
+    ) ?? [];
+
+  expect(stageResponses).toHaveLength(1);
+  expect(stageResponses[0]?.content).toBe("고쳐서 다시 적은 사유");
+});
+
 /**
  * 앞의 두 힌트만 흉내 내고, **Level 2 힌트는 진짜로 받는다.**
  *

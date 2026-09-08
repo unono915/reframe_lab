@@ -39,6 +39,23 @@ export const FEEDBACK_SELF_CHECK_PROMPT_KEY = "self_checklist_completed";
  */
 export const SOLO_MODE_PROMPT_KEY = "solo_mode";
 
+/**
+ * 이전 단계로 돌아가 정의를 고쳤을 때 앱이 남기는 표식.
+ *
+ * 그 경로는 사용자에게 "왜 바꾸나요"를 묻지 않는다 — 되돌아가 문장을 고치는 것은
+ * 되돌아보기와 다른 행동이라 그 자리에서 이유를 요구하지 않는 편이 맞다. 다만
+ * `changeReason`은 비워둘 수 없는 자리가 아니어서 앱이 이 문장을 대신 넣어왔다.
+ *
+ * 문제는 기록 화면이 그것을 **"바꾼 이유:"**라는 라벨로 보여줬다는 점이다. 사용자가
+ * 쓰지 않은 문장이 사용자의 말처럼 남았고, 두 주 뒤에 읽는 사람은 자기가 쓴 이유와
+ * 앱이 넣은 문장을 구분할 수 없다. 원칙 6(모든 산출물의 author를 기록한다)이 지키려는
+ * 것이 정확히 그 구분이다.
+ *
+ * 값을 계속 쓰되(이미 저장된 기록도 같은 문자열이다) 화면에서는 앱의 메모로 읽히게
+ * 한다. 그래서 이 상수가 표시 쪽에서도 필요하다.
+ */
+export const PAST_STAGE_EDIT_REASON = "이전 단계로 돌아가 수정함";
+
 /** 이 세션을 사용자가 "AI 없이" 하기로 선택했는가. */
 export function isSoloModeSession(snapshot: TrainingSessionSnapshot): boolean {
   return snapshot.stageResponses.some(

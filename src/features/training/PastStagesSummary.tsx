@@ -5,6 +5,7 @@ import type { Stage, TrainingSessionSnapshot } from "@/domain/types";
 import { Badge, Button, Card, InlineError, Stack, Textarea } from "@/components/ui";
 import { STAGE_ORDER, stageIndex, stageLabel } from "@/domain/training/stages";
 import { useTrainingSession } from "./TrainingSessionProvider";
+import { PAST_STAGE_EDIT_REASON } from "@/domain/training/requirements";
 import { useMutationAction } from "./useMutationAction";
 
 /**
@@ -106,7 +107,7 @@ function PastStageRow({
           contextWhere: undefined,
         });
       }
-      return submitDefinition({ text, changeReason: "이전 단계로 돌아가 수정함" });
+      return submitDefinition({ text, changeReason: PAST_STAGE_EDIT_REASON });
     });
     if (!ok) return;
     setEditing(false);

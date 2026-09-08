@@ -13,6 +13,7 @@ import {
   compareSelfAssessmentWithAi,
   overconfidentDimensions,
 } from "@/domain/training/self-assessment";
+import { PAST_STAGE_EDIT_REASON } from "@/domain/training/requirements";
 import { fetchJson } from "@/lib/fetch-json";
 
 function detectTimezone(): string {
@@ -276,11 +277,18 @@ export default function ResultPage() {
               지금 생각 (v{latest.versionNumber})
             </p>
             <p className="text-body text-ink">{latest.text}</p>
-            {latest.changeReason && (
-              <p className="mt-2 text-caption text-text-secondary">
-                바꾼 이유: {latest.changeReason}
-              </p>
-            )}
+            {latest.changeReason &&
+              (latest.changeReason === PAST_STAGE_EDIT_REASON ? (
+                // 앱이 남긴 메모다. 사용자가 쓴 이유와 같은 라벨을 달면, 두 주 뒤에
+                // 읽는 사람은 자기가 쓴 문장과 앱이 넣은 문장을 구분할 수 없다.
+                <p className="mt-2 text-caption text-text-tertiary">
+                  이전 단계로 돌아가 고쳐 쓴 문장이에요.
+                </p>
+              ) : (
+                <p className="mt-2 text-caption text-text-secondary">
+                  바꾼 이유: {latest.changeReason}
+                </p>
+              ))}
           </Card>
         </Stack>
       )}
